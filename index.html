@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Nevexona AI Studio</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        cyber: {
+          bg: '#060911',
+          card: '#0f172a',
+          border: '#1e293b',
+          accent: '#6366f1',
+          neonCyan: '#06b6d4',
+          neonPurple: '#a855f7'
+        }
+      }
+    }
+  }
+}
+</script>
+<style>
+body {
+  background-color: #060911;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+.glass {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.neon-text {
+  background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.3);
+  border-radius: 9999px;
+}
+input, textarea, select {
+  -webkit-user-select: text;
+  user-select: text;
+}
+</style>
+</head>
+<body class="text-slate-100 antialiased h-screen flex flex-col md:flex-row overflow-hidden select-none">
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-md p-4">
+  <div class="glass p-6 md:p-8 rounded-3xl w-full max-w-sm md:max-w-md border border-slate-800 shadow-2xl relative">
+    <div class="flex flex-col items-center mb-6">
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 via-indigo-600 to-purple-600 p-0.5 mb-3 shadow-lg shadow-indigo-500/30">
+        <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
+          <span class="text-2xl font-black neon-text">N</span>
+        </div>
+      </div>
+      <h1 class="text-xl md:text-2xl font-bold tracking-tight text-white">Nevexona AI</h1>
+      <p id="auth-subtitle" class="text-xs text-slate-400 mt-1 text-center">Войдите или зарегистрируйтесь, чтобы продолжить</p>
+    </div>
+    <form id="auth-form" onsubmit="handleLocalAuth(event)" class="space-y-3">
+      <div id="name-group" class="hidden">
+        <label class="block text-[11px] font-medium text-slate-400 mb-1">Имя пользователя</label>
+        <input type="text" id="auth-name" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 transition" placeholder="Алексей ИИ">
+      </div>
+      <div>
+        <label class="block text-[11px] font-medium text-slate-400 mb-1">Email</label>
+        <input type="email" id="auth-email" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 transition" placeholder="user@nevexona.ai">
+      </div>
+      <div>
+        <label class="block text-[11px] font-medium text-slate-400 mb-1">Пароль</label>
+        <input type="password" id="auth-password" required class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 transition" placeholder="••••••••">
+      </div>
+      <button type="submit" id="auth-submit-btn" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 mt-2">
+        <span id="auth-submit-text">Войти в студию</span>
+        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+      </button>
+    </form>
+    <div class="mt-4 text-center space-y-2">
+      <button onclick="toggleAuthMode()" id="auth-toggle-btn" class="text-[11px] text-slate-400 hover:text-indigo-400 transition block w-full">
+        Нет аккаунта? Зарегистрироваться
+      </button>
+      <button onclick="quickGuestLogin()" class="text-[10px] text-indigo-400 hover:underline">
+        Быстрый демо-вход
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MOBILE TOP BAR -->
+<header class="md:hidden h-14 bg-slate-950/90 border-b border-slate-800/80 px-4 flex items-center justify-between z-30 shrink-0">
+  <div class="flex items-center gap-2.5">
+    <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 to-purple-600 p-0.5">
+      <div class="w-full h-full bg-slate-950 rounded-[6px] flex items-center justify-center">
+        <span class="text-sm font-black neon-text">N</span>
+      </div>
+    </div>
+    <span class="font-bold text-xs tracking-wide text-white">Nevexona AI</span>
+    <span id="mobile-role-badge" class="text-[9px] font-bold px-1.5 py-0.2 rounded border bg-indigo-500/20 text-indigo-300 border-indigo-500/40">USER</span>
+  </div>
+  <button onclick="toggleMobileDrawer()" class="p-2 text-slate-300 hover:text-white rounded-lg bg-slate-900 border border-slate-800">
+    <i data-lucide="menu" class="w-5 h-5"></i>
+  </button>
+</header>
+
+<!-- MOBILE DRAWER -->
+<div id="mobile-drawer" class="fixed inset-0 z-40 bg-slate-950/90 backdrop-blur-md flex flex-col justify-between p-6 transform translate-x-full transition-transform duration-300 md:hidden">
+  <div class="space-y-6">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-indigo-600/30 flex items-center justify-center font-bold text-xs text-indigo-300" id="drawer-avatar">U</div>
+        <div>
+          <p class="text-xs font-bold text-white" id="drawer-user-name">User Name</p>
+          <p class="text-[10px] text-slate-400" id="drawer-user-email">user@mail.com</p>
+        </div>
+      </div>
+      <button onclick="toggleMobileDrawer()" class="p-1 text-slate-400 hover:text-white">
+        <i data-lucide="x" class="w-6 h-6"></i>
+      </button>
+    </div>
+    <nav class="space-y-2">
+      <button onclick="switchTabMobile('chat')" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-medium text-slate-200 bg-slate-900 border border-slate-800">
+        <i data-lucide="message-square" class="w-4 h-4 text-indigo-400"></i>
+        <span>ИИ Чат & Голос</span>
+      </button>
+      <button onclick="switchTabMobile('image')" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-medium text-slate-200 bg-slate-900 border border-slate-800">
+        <i data-lucide="image" class="w-4 h-4 text-emerald-400"></i>
+        <span>Генерация Фото</span>
+      </button>
+      <button onclick="switchTabMobile('video')" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-medium text-slate-200 bg-slate-900 border border-slate-800">
+        <i data-lucide="video" class="w-4 h-4 text-purple-400"></i>
+        <span>Видео Студия</span>
+      </button>
+      <button onclick="switchTabMobile('gallery')" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-medium text-slate-200 bg-slate-900 border border-slate-800">
+        <i data-lucide="film" class="w-4 h-4 text-cyan-400"></i>
+        <span>Галерея</span>
+      </button>
+      <button onclick="switchTabMobile('admin')" id="mobile-nav-admin" class="w-full hidden items-center gap-3 px-3 py-3 rounded-xl text-xs font-medium text-amber-300 bg-amber-500/10 border border-amber-500/30">
+        <i data-lucide="shield-alert" class="w-4 h-4 text-amber-400"></i>
+        <span>Панель Владельца</span>
+      </button>
+      <button onclick="switchTabMobile('settings')" class="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-medium text-slate-200 bg-slate-900 border border-slate-800">
+        <i data-lucide="settings" class="w-4 h-4 text-amber-400"></i>
+        <span>Настройки</span>
+      </button>
+    </nav>
+  </div>
+  <button onclick="handleLogout()" class="w-full py-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 rounded-xl text-xs font-medium flex items-center justify-center gap-2">
+    <i data-lucide="log-out" class="w-4 h-4"></i>
+    <span>Выйти из аккаунта</span>
+  </button>
+</div>
+
+<!-- MAIN APP -->
+<div id="app-container" class="flex-1 flex w-full h-full opacity-30 pointer-events-none transition-opacity duration-300 overflow-hidden relative">
+
+  <!-- DESKTOP SIDEBAR -->
+  <aside class="hidden md:flex w-64 glass border-r border-slate-800/60 flex-col justify-between p-4 z-20 shrink-0">
+    <div class="space-y-6">
+      <div class="flex items-center gap-3 px-2">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-indigo-600 to-purple-600 p-0.5 shadow-lg shadow-indigo-500/20">
+          <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+            <span class="text-xl font-black neon-text">N</span>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <h2 class="font-bold text-sm tracking-wide text-white">Nevexona AI</h2>
+            <span id="role-badge" class="text-[9px] font-bold px-1.5 py-0.2 rounded border">ROLE</span>
+          </div>
+          <span class="text-[10px] text-cyan-400 font-medium">STUDIO PRO</span>
+        </div>
+      </div>
+      <nav class="space-y-1">
+        <button onclick="switchTab('chat')" id="nav-chat" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition text-indigo-400 bg-indigo-500/10 border border-indigo-500/20">
+          <i data-lucide="message-square" class="w-4 h-4"></i>
+          <span>ИИ Чат</span>
+        </button>
+        <button onclick="switchTab('image')" id="nav-image" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
+          <i data-lucide="image" class="w-4 h-4"></i>
+          <span>Генерация Фото</span>
+        </button>
+        <button onclick="switchTab('video')" id="nav-video" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
+          <i data-lucide="video" class="w-4 h-4"></i>
+          <span>Видео Студия</span>
+        </button>
+        <button onclick="switchTab('gallery')" id="nav-gallery" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
+          <i data-lucide="film" class="w-4 h-4"></i>
+          <span>Галерея</span>
+        </button>
+        <button onclick="switchTab('admin')" id="nav-admin" class="w-full hidden items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20 transition">
+          <i data-lucide="shield-alert" class="w-4 h-4"></i>
+          <span>Панель Владельца</span>
+        </button>
+        <button onclick="switchTab('settings')" id="nav-settings" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+          <span>Настройки</span>
+        </button>
+      </nav>
+    </div>
+    <div class="border-t border-slate-800/80 pt-4 px-2 space-y-3">
+      <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 space-y-2 text-[11px]">
+        <div class="flex justify-between items-center text-slate-400 font-medium">
+          <span>Мои лимиты:</span>
+          <span class="text-[10px] text-indigo-400">Суточные</span>
+        </div>
+        <div>
+          <div class="flex justify-between text-[10px] mb-1">
+            <span class="text-slate-400">Чат:</span>
+            <span id="limit-chat-text" class="text-slate-200">0/10</span>
+          </div>
+          <div class="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+            <div id="bar-chat" class="h-full bg-indigo-500 w-0 transition-all"></div>
+          </div>
+        </div>
+        <div>
+          <div class="flex justify-between text-[10px] mb-1">
+            <span class="text-slate-400">Фото:</span>
+            <span id="limit-img-text" class="text-slate-200">0/5</span>
+          </div>
+          <div class="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+            <div id="bar-img" class="h-full bg-emerald-500 w-0 transition-all"></div>
+          </div>
+        </div>
+        <div>
+          <div class="flex justify-between text-[10px] mb-1">
+            <span class="text-slate-400">Видео:</span>
+            <span id="limit-video-text" class="text-slate-200">0/2</span>
+          </div>
+          <div class="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+            <div id="bar-video" class="h-full bg-purple-500 w-0 transition-all"></div>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2.5 overflow-hidden">
+          <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white shrink-0" id="user-avatar">A</div>
+          <div class="truncate">
+            <p class="text-xs font-medium text-slate-200 truncate" id="user-display-name">User Name</p>
+            <p class="text-[10px] text-slate-400 truncate" id="user-display-email">user@mail.com</p>
+          </div>
+        </div>
+        <button onclick="handleLogout()" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition" title="Выйти">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="flex-1 flex flex-col relative overflow-hidden bg-[#060911] pb-16 md:pb-0">
+    <div id="site-banner" class="hidden shrink-0 px-4 py-2 text-[11px] text-slate-200 bg-slate-800/80 border-b border-slate-700"></div>
+
+    <!-- TAB CHAT -->
+    <section id="tab-chat" class="flex-1 flex flex-col h-full overflow-hidden">
+      <header class="h-12 md:h-14 border-b border-slate-800/60 px-4 md:px-6 flex items-center justify-between shrink-0 glass">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <h3 class="text-xs font-semibold text-slate-200">Nevexona AI Chat Engine</h3>
+        </div>
+      </header>
+      <div id="chat-messages" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 custom-scrollbar">
+        <div class="flex gap-2.5 max-w-3xl">
+          <div class="w-7 h-7 md:w-8 md:h-8 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shrink-0">
+            <span class="text-xs font-bold text-indigo-400">N</span>
+          </div>
+          <div class="glass p-3.5 md:p-4 rounded-2xl rounded-tl-none text-xs text-slate-300 leading-relaxed border border-slate-800">
+            Привет! Я Nevexona AI. Готов отвечать на вопросы и генерировать медиа. На GitHub Pages работаю в локальном режиме + с вашим Gemini API ключом.
+          </div>
+        </div>
+      </div>
+      <div class="p-3 md:p-4 border-t border-slate-800/60 glass shrink-0">
+        <form onsubmit="sendChatMessage(event)" class="max-w-4xl mx-auto flex gap-2">
+          <input type="text" id="chat-input" class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 transition" placeholder="Спросить Nevexona AI...">
+          <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 md:px-5 rounded-xl text-xs font-medium transition flex items-center justify-center shrink-0 shadow-lg shadow-indigo-600/20">
+            <i data-lucide="send" class="w-4 h-4"></i>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- TAB IMAGE -->
+    <section id="tab-image" class="flex-1 hidden p-4 md:p-8 overflow-y-auto custom-scrollbar space-y-4 md:space-y-6">
+      <div class="max-w-3xl mx-auto space-y-4 md:space-y-6">
+        <div>
+          <h2 class="text-lg md:text-xl font-bold text-white flex items-center gap-2">
+            <i data-lucide="sparkles" class="w-5 h-5 text-emerald-400"></i>
+            <span>Генератор Фото (Gemini)</span>
+          </h2>
+          <p class="text-[11px] text-slate-400 mt-0.5">Создавайте арты и фото по описанию (модель gemini-3.1-flash-image)</p>
+        </div>
+        <div class="glass p-4 md:p-6 rounded-2xl border border-slate-800/80 space-y-3 md:space-y-4">
+          <div>
+            <label class="block text-[11px] font-medium text-slate-300 mb-1.5">Промпт / Описание</label>
+            <textarea id="img-prompt" rows="3" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-emerald-500 transition" placeholder="Futuristic cyber city with glowing neon letter N, 8k resolution..."></textarea>
+          </div>
+          <button onclick="generateImage()" id="btn-gen-img" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-3 rounded-xl text-xs transition shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2">
+            <i data-lucide="wand-2" class="w-4 h-4"></i>
+            <span>Сгенерировать фото</span>
+          </button>
+        </div>
+        <div id="img-result-container" class="hidden glass p-3 md:p-4 rounded-2xl border border-slate-800 space-y-3">
+          <div class="relative rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center min-h-[220px]">
+            <img id="img-output" class="max-h-[400px] w-auto object-contain rounded-xl" src="" alt="Result">
+            <div id="img-loader" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center gap-2 hidden">
+              <div class="w-7 h-7 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+              <p class="text-xs text-emerald-400 font-medium">Рендеринг...</p>
+            </div>
+          </div>
+          <div class="flex justify-end">
+            <a id="img-download-link" href="#" download="nevexona-art.png" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-xs rounded-xl font-medium transition text-white flex items-center gap-1.5">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              <span>Скачать</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB VIDEO -->
+    <section id="tab-video" class="flex-1 hidden p-4 md:p-8 overflow-y-auto custom-scrollbar space-y-4 md:space-y-6">
+      <div class="max-w-3xl mx-auto space-y-4 md:space-y-6">
+        <div>
+          <h2 class="text-lg md:text-xl font-bold text-white flex items-center gap-2">
+            <i data-lucide="video" class="w-5 h-5 text-purple-400"></i>
+            <span>Видео Студия</span>
+          </h2>
+          <p class="text-[11px] text-slate-400 mt-0.5">Gemini Omni Flash / Демо-режим</p>
+        </div>
+        <div class="glass p-4 md:p-6 rounded-2xl border border-slate-800/80 space-y-3 md:space-y-4">
+          <div>
+            <label class="block text-[11px] font-medium text-slate-300 mb-1.5">Движок</label>
+            <select id="video-engine-select" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-purple-500 transition mb-3">
+              <option value="gemini">Gemini Omni 1.1 Flash</option>
+              <option value="demo">Демо-режим (тестирование)</option>
+            </select>
+            <label class="block text-[11px] font-medium text-slate-300 mb-1.5">Сценарий видео</label>
+            <textarea id="video-prompt" rows="3" class="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-purple-500 transition" placeholder="Cinematic camera zoom into glowing neon structure..."></textarea>
+          </div>
+          <button onclick="generateVideo()" id="btn-gen-video" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-medium py-3 rounded-xl text-xs transition shadow-lg shadow-purple-600/20 flex items-center justify-center gap-2">
+            <i data-lucide="clapperboard" class="w-4 h-4"></i>
+            <span>Запустить рендеринг</span>
+          </button>
+        </div>
+        <div id="video-result-container" class="hidden glass p-3 md:p-4 rounded-2xl border border-slate-800 space-y-3">
+          <div class="relative rounded-xl overflow-hidden bg-slate-950 flex flex-col items-center justify-center min-h-[220px]">
+            <video id="video-player" controls class="w-full max-h-[400px] rounded-xl hidden"></video>
+            <div id="video-rendering-box" class="p-6 text-center space-y-3">
+              <div id="video-spinner" class="w-10 h-10 border-4 border-purple-500/20 border-t-purple-500 rounded-full animate-spin mx-auto"></div>
+              <p id="video-status-text" class="text-xs text-purple-300">Подготовка...</p>
+            </div>
+          </div>
+          <div class="flex justify-end hidden" id="video-download-box">
+            <a id="video-download-link" href="#" download="nevexona-video.mp4" target="_blank" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-xs rounded-xl font-medium transition text-white flex items-center gap-1.5">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              <span>Скачать .mp4</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB GALLERY -->
+    <section id="tab-gallery" class="flex-1 hidden p-4 md:p-8 overflow-y-auto custom-scrollbar space-y-4 md:space-y-6">
+      <div class="max-w-4xl mx-auto space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg md:text-xl font-bold text-white">Галерея Работ</h2>
+          <button onclick="clearGallery()" class="text-xs text-rose-400 hover:text-rose-300 transition">Очистить</button>
+        </div>
+        <div id="gallery-grid" class="grid grid-cols-2 md:grid-cols-3 gap-3"></div>
+        <div id="gallery-empty" class="glass p-8 rounded-2xl text-center space-y-2">
+          <i data-lucide="folder-open" class="w-8 h-8 text-slate-600 mx-auto"></i>
+          <p class="text-xs text-slate-400">Галерея пока пуста</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB ADMIN -->
+    <section id="tab-admin" class="flex-1 hidden p-4 md:p-8 overflow-y-auto custom-scrollbar">
+      <div class="max-w-4xl mx-auto space-y-5">
+        <div>
+          <h2 class="text-lg font-semibold text-white">Панель владельца</h2>
+          <p class="text-[11px] text-slate-500 mt-0.5">Доступ только для admin@nevexona.ai</p>
+        </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+          <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><p class="text-[10px] text-slate-500">Пользователи</p><p id="stat-users-count" class="text-xl font-semibold text-white mt-1">0</p></div>
+          <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><p class="text-[10px] text-slate-500">Запросов в чат</p><p id="stat-chat-count" class="text-xl font-semibold text-white mt-1">0</p></div>
+          <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><p class="text-[10px] text-slate-500">Фото</p><p id="stat-img-count" class="text-xl font-semibold text-white mt-1">0</p></div>
+          <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-3"><p class="text-[10px] text-slate-500">Видео</p><p id="stat-video-count" class="text-xl font-semibold text-white mt-1">0</p></div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Настройки сайта</p>
+            <label class="flex items-center justify-between py-2.5 border-b border-slate-800/70 text-xs text-slate-300"><span>Регистрация новых</span><input type="checkbox" id="set-reg" onchange="adminToggle('allowReg', this.checked)" class="w-4 h-4 accent-indigo-500"></label>
+            <label class="flex items-center justify-between py-2.5 border-b border-slate-800/70 text-xs text-slate-300"><span>Режим техработ</span><input type="checkbox" id="set-maint" onchange="adminToggle('maintenance', this.checked)" class="w-4 h-4 accent-indigo-500"></label>
+            <label class="flex items-center justify-between py-2.5 border-b border-slate-800/70 text-xs text-slate-300"><span>Чат включён</span><input type="checkbox" id="set-f-chat" onchange="adminToggle('f:chat', this.checked)" class="w-4 h-4 accent-indigo-500"></label>
+            <label class="flex items-center justify-between py-2.5 border-b border-slate-800/70 text-xs text-slate-300"><span>Фото включено</span><input type="checkbox" id="set-f-img" onchange="adminToggle('f:img', this.checked)" class="w-4 h-4 accent-indigo-500"></label>
+            <label class="flex items-center justify-between py-2.5 border-b border-slate-800/70 text-xs text-slate-300"><span>Видео включено</span><input type="checkbox" id="set-f-video" onchange="adminToggle('f:video', this.checked)" class="w-4 h-4 accent-indigo-500"></label>
+            <p class="text-[10px] text-slate-500 mt-4 mb-2">Лимиты для новых пользователей</p>
+            <div class="grid grid-cols-3 gap-2">
+              <label class="block"><span class="text-[10px] text-slate-500">Чат</span><input type="number" min="0" id="def-chat" class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-white"></label>
+              <label class="block"><span class="text-[10px] text-slate-500">Фото</span><input type="number" min="0" id="def-img" class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-white"></label>
+              <label class="block"><span class="text-[10px] text-slate-500">Видео</span><input type="number" min="0" id="def-video" class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-white"></label>
+            </div>
+            <button onclick="adminSaveDefaults()" class="mt-3 px-3 py-2 rounded-lg border border-slate-700 text-[11px] text-slate-200 hover:bg-slate-800 transition">Сохранить лимиты</button>
+          </div>
+          <div class="space-y-4">
+            <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Объявление</p>
+              <textarea id="set-banner" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-white" placeholder="Текст появится сверху у всех"></textarea>
+              <div class="flex gap-2 mt-2">
+                <button onclick="adminSaveBanner()" class="px-3 py-2 rounded-lg border border-slate-700 text-[11px] text-slate-200 hover:bg-slate-800 transition">Опубликовать</button>
+                <button onclick="adminClearBanner()" class="px-3 py-2 rounded-lg border border-slate-700 text-[11px] text-slate-200 hover:bg-slate-800 transition">Убрать</button>
+              </div>
+            </div>
+            <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+              <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Данные</p>
+              <div class="flex flex-wrap gap-2">
+                <button onclick="adminExport('json')" class="px-3 py-2 rounded-lg border border-slate-700 text-[11px] text-slate-200 hover:bg-slate-800 transition">Экспорт JSON</button>
+                <button onclick="adminExport('csv')" class="px-3 py-2 rounded-lg border border-slate-700 text-[11px] text-slate-200 hover:bg-slate-800 transition">Экспорт CSV</button>
+                <button onclick="document.getElementById('admin-import').click()" class="px-3 py-2 rounded-lg border border-slate-700 text-[11px] text-slate-200 hover:bg-slate-800 transition">Импорт JSON</button>
+                <button onclick="adminResetAll()" class="px-3 py-2 rounded-lg border border-slate-700 text-[11px] text-slate-200 hover:bg-slate-800 transition">Сбросить счётчики</button>
+              </div>
+              <input type="file" id="admin-import" accept="application/json" class="hidden" onchange="adminImport(this)">
+            </div>
+          </div>
+        </div>
+        <div class="rounded-xl border border-slate-800 bg-slate-900/60">
+          <div class="p-4 pb-3 flex items-center justify-between gap-3">
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Пользователи</p>
+            <input type="search" id="admin-search" oninput="renderAdminPanel()" placeholder="Поиск..." class="w-48 md:w-64 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-white">
+          </div>
+          <div id="admin-users-list" class="divide-y divide-slate-800/70 border-t border-slate-800/70"></div>
+        </div>
+        <div class="rounded-xl border border-slate-800 bg-slate-900/60">
+          <div class="p-4 pb-3 flex items-center justify-between">
+            <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Журнал</p>
+            <button onclick="adminClearLog()" class="text-[11px] text-slate-500 hover:text-slate-300">Очистить</button>
+          </div>
+          <div id="admin-log" class="border-t border-slate-800/70 max-h-64 overflow-y-auto custom-scrollbar divide-y divide-slate-800/50"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB SETTINGS -->
+    <section id="tab-settings" class="flex-1 hidden p-4 md:p-8 overflow-y-auto custom-scrollbar">
+      <div class="max-w-xl mx-auto space-y-4">
+        <div>
+          <h2 class="text-lg font-semibold text-white">Настройки аккаунта</h2>
+          <p id="set-acc-email" class="text-[11px] text-slate-500 mt-0.5"></p>
+        </div>
+        <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Профиль</p>
+          <input type="text" id="set-name" maxlength="40" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-white" placeholder="Ваше имя">
+          <button onclick="saveProfileName()" class="mt-2 px-3 py-2 rounded-lg border border-slate-700 text-[11px] text-slate-200 hover:bg-slate-800 transition">Сохранить имя</button>
+        </div>
+        <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Пароль</p>
+          <div class="space-y-2">
+            <input type="password" id="set-pw-old" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-white" placeholder="Текущий пароль">
+            <input type="password" id="set-pw-new" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-white" placeholder="Новый пароль (от 6 символов)">
+          </div>
+          <button onclick="changePassword()" class="mt-2 px-3 py-2 rounded-lg border border-slate-700 text-[11px] text-slate-200 hover:bg-slate-800 transition">Сменить пароль</button>
+        </div>
+        <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Использование</p>
+          <div id="set-usage"></div>
+        </div>
+        <div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Данные</p>
+          <div class="flex flex-wrap gap-2">
+            <button onclick="clearGallery()" class="px-3 py-2 rounded-lg border border-slate-700 text-[11px] text-slate-200 hover:bg-slate-800 transition">Очистить галерею</button>
+            <button id="set-delete" onclick="deleteMyAccount()" class="px-3 py-2 rounded-lg border border-slate-700 text-[11px] text-slate-200 hover:bg-slate-800 transition !text-rose-400">Удалить аккаунт</button>
+          </div>
+        </div>
+        <div id="keys-block" class="rounded-xl border border-slate-800 bg-slate-900/60 p-4 space-y-3" style="display:none">
+          <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">API ключи (только владелец)</p>
+          <label class="block">
+            <span class="text-[10px] text-slate-500">Gemini API Key (чат + фото + видео)</span>
+            <input type="password" id="key-gemini" class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-white" placeholder="Вставьте ключ из aistudio.google.com">
+          </label>
+          <button onclick="saveApiKeys()" class="px-3 py-2 rounded-lg border border-slate-700 text-[11px] text-slate-200 hover:bg-slate-800 transition">Сохранить ключи</button>
+          <p class="text-[10px] text-slate-500">Ключ хранится только в вашем браузере (localStorage).</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- MOBILE BOTTOM NAV -->
+<nav class="md:hidden fixed bottom-0 inset-x-0 h-14 bg-slate-950/95 border-t border-slate-800/80 flex items-center justify-around z-30 px-2 glass">
+  <button onclick="switchTab('chat')" id="mob-nav-chat" class="flex flex-col items-center justify-center gap-0.5 text-indigo-400 flex-1 py-1">
+    <i data-lucide="message-square" class="w-4 h-4"></i>
+    <span class="text-[9px] font-medium">Чат</span>
+  </button>
+  <button onclick="switchTab('image')" id="mob-nav-image" class="flex flex-col items-center justify-center gap-0.5 text-slate-400 flex-1 py-1">
+    <i data-lucide="image" class="w-4 h-4"></i>
+    <span class="text-[9px] font-medium">Фото</span>
+  </button>
+  <button onclick="switchTab('video')" id="mob-nav-video" class="flex flex-col items-center justify-center gap-0.5 text-slate-400 flex-1 py-1">
+    <i data-lucide="video" class="w-4 h-4"></i>
+    <span class="text-[9px] font-medium">Видео</span>
+  </button>
+  <button onclick="switchTab('gallery')" id="mob-nav-gallery" class="flex flex-col items-center justify-center gap-0.5 text-slate-400 flex-1 py-1">
+    <i data-lucide="film" class="w-4 h-4"></i>
+    <span class="text-[9px] font-medium">Галерея</span>
+  </button>
+  <button onclick="switchTab('settings')" id="mob-nav-settings" class="flex flex-col items-center justify-center gap-0.5 text-slate-400 flex-1 py-1">
+    <i data-lucide="settings" class="w-4 h-4"></i>
+    <span class="text-[9px] font-medium">Ещё</span>
+  </button>
+</nav>
+
+<script>
+/* ===================== STATE ===================== */
+let currentUser = null;
+let isSignUpMode = false;
+let usersDB = [];
+let galleryData = [];
+let chatHistory = [];
+let chatBusy = false;
+let settings = null;
+let logDB = [];
+const DEFAULT_SETTINGS = {
+  allowReg: true,
+  maintenance: false,
+  features: { chat: true, img: true, video: true },
+  defaults: { chat: 15, img: 5, video: 2 },
+  banner: ''
+};
+let initialChatHTML = '';
+const ADMIN_EMAIL = 'admin@nevexona.ai';
+
+/* ===================== INIT ===================== */
+window.onload = function() {
+  lucide.createIcons();
+  initialChatHTML = document.getElementById('chat-messages').innerHTML;
+  initDB();
+  const k = getSavedKeys();
+  if (k.gemini) document.getElementById('key-gemini').value = k.gemini;
+  restoreSession();
+};
+
+/* ===================== UTILS ===================== */
+function escapeHtml(text) {
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  return String(text).replace(/[&<>"']/g, c => map[c]);
+}
+
+function isAdmin() {
+  return !!currentUser && currentUser.email === ADMIN_EMAIL;
+}
+
+function loadSettings() {
+  let st = {};
+  try { st = JSON.parse(localStorage.getItem('nevexona_settings')) || {}; } catch (e) {}
+  settings = {
+    ...DEFAULT_SETTINGS,
+    ...st,
+    features: { ...DEFAULT_SETTINGS.features, ...(st.features || {}) },
+    defaults: { ...DEFAULT_SETTINGS.defaults, ...(st.defaults || {}) }
+  };
+  try { logDB = JSON.parse(localStorage.getItem('nevexona_log')) || []; } catch (e) { logDB = []; }
+  if (!Array.isArray(logDB)) logDB = [];
+}
+
+function saveSettings() {
+  localStorage.setItem('nevexona_settings', JSON.stringify(settings));
+}
+
+function logEvent(text) {
+  logDB.unshift({ t: Date.now(), text });
+  logDB = logDB.slice(0, 100);
+  try { localStorage.setItem('nevexona_log', JSON.stringify(logDB)); } catch (e) {}
+}
+
+async function hashPw(email, pw) {
+  const str = 'nvx:' + email + ':' + pw;
+  if (window.crypto && crypto.subtle) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  let h = 5381;
+  for (const c of str) h = ((h << 5) + h + c.charCodeAt(0)) | 0;
+  return 'x' + h;
+}
+
+/* ===================== DB ===================== */
+function initDB() {
+  try { usersDB = JSON.parse(localStorage.getItem('nevexona_users')) || []; } catch (e) { usersDB = []; }
+  if (!Array.isArray(usersDB)) usersDB = [];
+
+  if (!usersDB.find(u => u.email === ADMIN_EMAIL)) {
+    usersDB.push({
+      email: ADMIN_EMAIL,
+      name: 'Владелец Nevexona',
+      role: 'admin',
+      usedChat: 0, maxChat: 9999,
+      usedImg: 0, maxImg: 9999,
+      usedVideo: 0, maxVideo: 9999
+    });
+  }
+  usersDB.forEach(u => { u.role = u.email === ADMIN_EMAIL ? 'admin' : 'user'; });
+  loadSettings();
+  saveDB();
+}
+
+function saveDB() {
+  localStorage.setItem('nevexona_users', JSON.stringify(usersDB));
+}
+
+function restoreSession() {
+  const email = localStorage.getItem('nevexona_session');
+  const user = email && usersDB.find(u => u.email === email);
+  if (user && !user.banned) {
+    currentUser = user;
+    onUserLoggedIn();
+  }
+}
+
+/* ===================== AUTH ===================== */
+async function handleLocalAuth(e) {
+  e.preventDefault();
+  const email = document.getElementById('auth-email').value.trim().toLowerCase();
+  const password = document.getElementById('auth-password').value;
+  const nameInput = document.getElementById('auth-name').value.trim();
+
+  if (!email || !password) {
+    alert('Введите email и пароль');
+    return;
+  }
+
+  const hash = await hashPw(email, password);
+  let user = usersDB.find(u => u.email === email);
+
+  if (isSignUpMode) {
+    if (user) {
+      alert('Аккаунт с таким email уже существует. Войдите в него.');
+      return;
+    }
+    if (!settings.allowReg) {
+      alert('Регистрация закрыта владельцем сайта.');
+      return;
+    }
+    user = {
+      email,
+      name: nameInput || email.split('@')[0],
+      role: 'user',
+      pw: hash,
+      created: Date.now(),
+      usedChat: 0, maxChat: settings.defaults.chat,
+      usedImg: 0, maxImg: settings.defaults.img,
+      usedVideo: 0, maxVideo: settings.defaults.video
+    };
+    usersDB.push(user);
+    saveDB();
+    logEvent('Регистрация: ' + email);
+  } else {
+    if (!user) {
+      alert('Аккаунт не найден. Нажмите «Зарегистрироваться».');
+      return;
+    }
+    if (user.pw && user.pw !== hash) {
+      alert('Неверный пароль');
+      return;
+    }
+    if (!user.pw) {
+      user.pw = hash;
+      saveDB();
+      if (email === ADMIN_EMAIL) alert('Пароль владельца установлен. Запомните его.');
+    }
+  }
+  loginAs(user);
+}
+
+function quickGuestLogin() {
+  let demoUser = usersDB.find(u => u.email === 'demo@nevexona.ai');
+  if (!demoUser) {
+    demoUser = {
+      email: 'demo@nevexona.ai',
+      name: 'Демо Пользователь',
+      role: 'user',
+      usedChat: 0, maxChat: settings.defaults.chat,
+      usedImg: 0, maxImg: settings.defaults.img,
+      usedVideo: 0, maxVideo: settings.defaults.video
+    };
+    usersDB.push(demoUser);
+    saveDB();
+  }
+  loginAs(demoUser);
+}
+
+function loginAs(user) {
+  if (user.banned) {
+    alert('Аккаунт заблокирован владельцем.');
+    return;
+  }
+  currentUser = user;
+  logEvent('Вход: ' + user.email);
+  localStorage.setItem('nevexona_session', user.email);
+  document.getElementById('auth-form').reset();
+  onUserLoggedIn();
+}
+
+function onUserLoggedIn() {
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app-container').classList.remove('opacity-30', 'pointer-events-none');
+
+  document.getElementById('user-display-name').innerText = currentUser.name;
+  document.getElementById('user-display-email').innerText = currentUser.email;
+  document.getElementById('user-avatar').innerText = (currentUser.name || 'U')[0].toUpperCase();
+  document.getElementById('drawer-user-name').innerText = currentUser.name;
+  document.getElementById('drawer-user-email').innerText = currentUser.email;
+  document.getElementById('drawer-avatar').innerText = (currentUser.name || 'U')[0].toUpperCase();
+
+  const badge = document.getElementById('role-badge');
+  const mobBadge = document.getElementById('mobile-role-badge');
+  const adminNav = document.getElementById('nav-admin');
+  const mobileAdminNav = document.getElementById('mobile-nav-admin');
+
+  if (currentUser.role === 'admin') {
+    badge.innerText = 'OWNER';
+    badge.className = 'text-[9px] font-bold px-1.5 py-0.2 rounded border bg-amber-500/20 text-amber-300 border-amber-500/40';
+    mobBadge.innerText = 'OWNER';
+    mobBadge.className = 'text-[9px] font-bold px-1.5 py-0.2 rounded border bg-amber-500/20 text-amber-300 border-amber-500/40';
+    adminNav.classList.remove('hidden');
+    adminNav.classList.add('flex');
+    mobileAdminNav.classList.remove('hidden');
+    mobileAdminNav.classList.add('flex');
+  } else {
+    badge.innerText = 'USER';
+    badge.className = 'text-[9px] font-bold px-1.5 py-0.2 rounded border bg-indigo-500/20 text-indigo-300 border-indigo-500/40';
+    mobBadge.innerText = 'USER';
+    mobBadge.className = 'text-[9px] font-bold px-1.5 py-0.2 rounded border bg-indigo-500/20 text-indigo-300 border-indigo-500/40';
+    adminNav.classList.add('hidden');
+    adminNav.classList.remove('flex');
+    mobileAdminNav.classList.add('hidden');
+    mobileAdminNav.classList.remove('flex');
+  }
+
+  applyRoleUI();
+  updateUserLimitUI();
+  renderAdminPanel();
+  loadGallery();
+  lucide.createIcons();
+}
+
+function applyRoleUI() {
+  const admin = isAdmin();
+  document.getElementById('keys-block').style.display = admin ? '' : 'none';
+  const b = document.getElementById('site-banner');
+  b.textContent = settings.banner || '';
+  b.classList.toggle('hidden', !settings.banner);
+  if (admin) renderAdminSettings();
+}
+
+function handleLogout() {
+  currentUser = null;
+  localStorage.removeItem('nevexona_session');
+  chatHistory = [];
+  galleryData = [];
+  document.getElementById('chat-messages').innerHTML = initialChatHTML;
+  document.getElementById('img-result-container').classList.add('hidden');
+  document.getElementById('video-result-container').classList.add('hidden');
+  switchTab('chat');
+  document.getElementById('auth-screen').classList.remove('hidden');
+  document.getElementById('app-container').classList.add('opacity-30', 'pointer-events-none');
+  toggleMobileDrawer(false);
+}
+
+function toggleAuthMode() {
+  isSignUpMode = !isSignUpMode;
+  document.getElementById('name-group').classList.toggle('hidden', !isSignUpMode);
+  document.getElementById('auth-submit-text').innerText = isSignUpMode ? 'Зарегистрироваться' : 'Войти в студию';
+  document.getElementById('auth-subtitle').innerText = isSignUpMode ? 'Создайте аккаунт, чтобы начать' : 'Войдите или зарегистрируйтесь, чтобы продолжить';
+  document.getElementById('auth-toggle-btn').innerText = isSignUpMode ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться';
+}
+
+function toggleMobileDrawer(open) {
+  const drawer = document.getElementById('mobile-drawer');
+  if (open === false) drawer.classList.add('translate-x-full');
+  else drawer.classList.toggle('translate-x-full');
+}
+
+function switchTabMobile(tab) {
+  switchTab(tab);
+  toggleMobileDrawer(false);
+}
+
+/* ===================== LIMITS ===================== */
+function checkAndConsumeLimit(type) {
+  if (!currentUser) return false;
+  if (currentUser.role === 'admin') return true;
+
+  if (settings.maintenance) {
+    alert('Идут технические работы. Попробуйте позже.');
+    return false;
+  }
+  if (settings.features[type] === false) {
+    alert('Эта функция временно отключена владельцем.');
+    return false;
+  }
+
+  let used = 0, max = 0;
+  if (type === 'chat')  { used = currentUser.usedChat;  max = currentUser.maxChat; }
+  if (type === 'img')   { used = currentUser.usedImg;   max = currentUser.maxImg; }
+  if (type === 'video') { used = currentUser.usedVideo; max = currentUser.maxVideo; }
+
+  if (used >= max) {
+    alert(`Лимит исчерпан! Вы использовали ${used}/${max} попыток.`);
+    return false;
+  }
+
+  if (type === 'chat')  currentUser.usedChat++;
+  if (type === 'img')   currentUser.usedImg++;
+  if (type === 'video') currentUser.usedVideo++;
+  saveDB();
+  updateUserLimitUI();
+  renderAdminPanel();
+  return true;
+}
+
+function refundLimit(type) {
+  if (!currentUser || currentUser.role === 'admin') return;
+  if (type === 'chat'  && currentUser.usedChat  > 0) currentUser.usedChat--;
+  if (type === 'img'   && currentUser.usedImg   > 0) currentUser.usedImg--;
+  if (type === 'video' && currentUser.usedVideo > 0) currentUser.usedVideo--;
+  saveDB();
+  updateUserLimitUI();
+  renderAdminPanel();
+}
+
+function updateUserLimitUI() {
+  if (!currentUser) return;
+  const isUnlim = currentUser.role === 'admin';
+  document.getElementById('limit-chat-text').innerText  = isUnlim ? 'Безлимит' : `${currentUser.usedChat}/${currentUser.maxChat}`;
+  document.getElementById('limit-img-text').innerText   = isUnlim ? 'Безлимит' : `${currentUser.usedImg}/${currentUser.maxImg}`;
+  document.getElementById('limit-video-text').innerText = isUnlim ? 'Безлимит' : `${currentUser.usedVideo}/${currentUser.maxVideo}`;
+  document.getElementById('bar-chat').style.width  = isUnlim ? '100%' : `${Math.min(100, (currentUser.usedChat  / (currentUser.maxChat  || 1)) * 100)}%`;
+  document.getElementById('bar-img').style.width   = isUnlim ? '100%' : `${Math.min(100, (currentUser.usedImg   / (currentUser.maxImg   || 1)) * 100)}%`;
+  document.getElementById('bar-video').style.width = isUnlim ? '100%' : `${Math.min(100, (currentUser.usedVideo / (currentUser.maxVideo || 1)) * 100)}%`;
+}
+
+/* ===================== TABS ===================== */
+function switchTab(tab) {
+  if (tab === 'admin' && !isAdmin()) tab = 'chat';
+  if (tab === 'admin') renderAdminPanel();
+  if (tab === 'settings') renderSettings();
+
+  const tabs = ['chat', 'image', 'video', 'gallery', 'admin', 'settings'];
+  tabs.forEach(t => {
+    const sec = document.getElementById(`tab-${t}`);
+    const btn = document.getElementById(`nav-${t}`);
+    const mobBtn = document.getElementById(`mob-nav-${t}`);
+
+    if (sec) sec.classList.toggle('hidden', t !== tab);
+
+    if (btn) {
+      if (t === tab) {
+        btn.className = t === 'admin'
+          ? 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-amber-400 bg-amber-500/10 border border-amber-500/20'
+          : 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-indigo-400 bg-indigo-500/10 border border-indigo-500/20';
+      } else {
+        btn.className = 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 transition';
+      }
+    }
+
+    if (mobBtn) {
+      mobBtn.className = t === tab
+        ? 'flex flex-col items-center justify-center gap-0.5 text-indigo-400 flex-1 py-1'
+        : 'flex flex-col items-center justify-center gap-0.5 text-slate-400 flex-1 py-1';
+    }
+  });
+  lucide.createIcons();
+}
+
+/* ===================== CHAT ===================== */
+function appendChatBubble(role, text) {
+  const chatMessages = document.getElementById('chat-messages');
+  const wrap = document.createElement('div');
+  if (role === 'user') {
+    wrap.className = 'flex gap-2.5 max-w-3xl ml-auto justify-end';
+    wrap.innerHTML = `<div class="bg-indigo-600 text-white p-3.5 rounded-2xl rounded-tr-none text-xs leading-relaxed whitespace-pre-wrap break-words">${escapeHtml(text)}</div>`;
+  } else {
+    wrap.className = 'flex gap-2.5 max-w-3xl';
+    wrap.innerHTML = `<div class="w-7 h-7 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center shrink-0"><span class="text-xs font-bold text-indigo-400">N</span></div><div class="glass p-3.5 rounded-2xl rounded-tl-none text-xs text-slate-300 leading-relaxed border border-slate-800 whitespace-pre-wrap break-words">${escapeHtml(text)}</div>`;
+  }
+  chatMessages.appendChild(wrap);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return wrap;
+}
+
+async function sendChatMessage(e) {
+  e.preventDefault();
+  if (chatBusy) return;
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text || !checkAndConsumeLimit('chat')) return;
+
+  input.value = '';
+  chatBusy = true;
+  appendChatBubble('user', text);
+  chatHistory.push({ role: 'user', text });
+
+  const pending = appendChatBubble('model', 'Nevexona AI думает...');
+  const pendingText = pending.lastElementChild;
+
+  try {
+    const apiKey = (getSavedKeys().gemini || '').trim();
+    let reply = null;
+
+    // Try real Gemini if key exists
+    if (apiKey) {
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: chatHistory.map(m => ({
+              role: m.role === 'model' ? 'model' : 'user',
+              parts: [{ text: m.text }]
+            })),
+            generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
+          reply = data.candidates[0].content.parts[0].text.trim();
+        }
+      } catch (err) {
+        console.warn('Gemini chat failed, fallback to local', err);
+      }
+    }
+
+    // Local smart fallback
+    if (!reply) {
+      reply = localChatReply(text);
+    }
+
+    pendingText.textContent = reply;
+    chatHistory.push({ role: 'model', text: reply });
+  } catch (err) {
+    pendingText.textContent = 'Ошибка: ' + (err.message || err);
+    refundLimit('chat');
+  } finally {
+    chatBusy = false;
+    document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+  }
+}
+
+function localChatReply(text) {
+  const t = text.toLowerCase();
+  if (t.includes('привет') || t.includes('здравств') || t.includes('hello')) {
+    return 'Привет! Я Nevexona AI. Чем могу помочь сегодня? Могу ответить на вопросы или помочь с идеями для генерации изображений и видео.';
+  }
+  if (t.includes('кто ты') || t.includes('что ты')) {
+    return 'Я Nevexona AI — клиентский AI-ассистент студии. Работаю прямо в браузере. Для генерации фото и видео владелец должен добавить Gemini API ключ в настройках.';
+  }
+  if (t.includes('фото') || t.includes('изображен') || t.includes('картинк')) {
+    return 'Перейди во вкладку «Генерация Фото», введи подробный промпт и нажми «Сгенерировать». Нужен Gemini API ключ от владельца.';
+  }
+  if (t.includes('видео')) {
+    return 'Видео генерируется во вкладке «Видео Студия». Есть демо-режим и реальный Gemini Omni Flash (нужен ключ).';
+  }
+  if (t.includes('лимит')) {
+    return 'Лимиты показаны в боковой панели. Владелец может их менять в панели администратора.';
+  }
+  if (t.includes('помоги') || t.includes('как')) {
+    return 'Конечно! Опиши задачу подробнее — я подскажу. Например, могу помочь составить хороший промпт для генерации.';
+  }
+  // Generic intelligent-ish response
+  return `Понял запрос: «${text}».\n\nНа GitHub Pages я работаю в локальном режиме. Для более умных ответов владелец может добавить Gemini API ключ в Настройках → API ключи. Пока могу помочь с идеями, промптами и навигацией по студии.`;
+}
+
+/* ===================== IMAGE ===================== */
+function getSavedKeys() {
+  try { return JSON.parse(localStorage.getItem('nevexona_keys')) || {}; } catch (e) { return {}; }
+}
+
+function b64ToBlobUrl(b64, mime) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: mime }));
+}
+
+async function generateGeminiImage(prompt, apiKey) {
+  // Using gemini-3.1-flash-image (Nano Banana 2) or fallback models
+  const models = ['gemini-3.1-flash-image', 'gemini-2.0-flash-preview-image-generation', 'gemini-2.0-flash-exp'];
+  let lastError = null;
+
+  for (const model of models) {
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseModalities: ['TEXT', 'IMAGE'],
+            temperature: 0.8
+          }
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        lastError = (data.error && data.error.message) || ('HTTP ' + res.status);
+        continue;
+      }
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      const imgPart = parts.find(p => p.inlineData || p.inline_data);
+      if (imgPart) {
+        const d = imgPart.inlineData || imgPart.inline_data;
+        return b64ToBlobUrl(d.data, d.mimeType || d.mime_type || 'image/png');
+      }
+      lastError = 'Модель не вернула изображение';
+    } catch (e) {
+      lastError = e.message;
+    }
+  }
+  throw new Error(lastError || 'Не удалось сгенерировать изображение');
+}
+
+async function generateImage() {
+  const btn = document.getElementById('btn-gen-img');
+  if (btn.disabled) return;
+  const prompt = document.getElementById('img-prompt').value.trim();
+  if (!prompt) { alert('Опишите, что нарисовать'); return; }
+
+  const apiKey = (getSavedKeys().gemini || document.getElementById('key-gemini').value || '').trim();
+  if (!apiKey) {
+    alert('Gemini API ключ не настроен.\nВладелец добавляет его в Настройки → API ключи.');
+    return;
+  }
+  if (!checkAndConsumeLimit('img')) return;
+
+  const container = document.getElementById('img-result-container');
+  const loader = document.getElementById('img-loader');
+  const imgOutput = document.getElementById('img-output');
+  container.classList.remove('hidden');
+  loader.classList.remove('hidden');
+  imgOutput.removeAttribute('src');
+  btn.disabled = true;
+
+  try {
+    const url = await generateGeminiImage(prompt, apiKey);
+    imgOutput.src = url;
+    document.getElementById('img-download-link').href = url;
+    saveToGallery('image', url, prompt);
+  } catch (err) {
+    refundLimit('img');
+    container.classList.add('hidden');
+    alert('Ошибка генерации фото:\n' + (err.message || err));
+  } finally {
+    loader.classList.add('hidden');
+    btn.disabled = false;
+  }
+}
+
+/* ===================== VIDEO ===================== */
+async function generateGeminiVideo(prompt, apiKey, statusEl) {
+  statusEl.textContent = 'Gemini Omni Flash рендерит видео... обычно 30–90 сек';
+  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions?key=' + apiKey, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'gemini-omni-1.1-flash',
+      input: prompt
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data.error && data.error.message) || ('HTTP ' + res.status));
+
+  let video = null;
+  for (const step of (data.steps || [])) {
+    if (step.type !== 'model_output') continue;
+    for (const c of (step.content || [])) {
+      if (c.type === 'video') video = c;
+    }
+  }
+  if (!video) throw new Error('Gemini не вернул видео. Попробуйте другой промпт или демо-режим.');
+
+  if (video.data) {
+    const bin = atob(video.data);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return URL.createObjectURL(new Blob([bytes], { type: video.mime_type || 'video/mp4' }));
+  }
+  if (video.uri) {
+    const r = await fetch(video.uri + (video.uri.includes('?') ? '&' : '?') + 'key=' + apiKey);
+    if (!r.ok) throw new Error('Не удалось скачать видео');
+    return URL.createObjectURL(await r.blob());
+  }
+  throw new Error('Пустой ответ от API');
+}
+
+async function generateVideo() {
+  const btn = document.getElementById('btn-gen-video');
+  if (btn.disabled) return;
+  const prompt = document.getElementById('video-prompt').value.trim();
+  if (!prompt) { alert('Опишите сцену для видео'); return; }
+
+  const engine = document.getElementById('video-engine-select').value;
+  const apiKey = (getSavedKeys().gemini || document.getElementById('key-gemini').value || '').trim();
+
+  if (engine === 'gemini' && !apiKey) {
+    alert('Вставьте Gemini API ключ в Настройках и нажмите «Сохранить».');
+    return;
+  }
+  if (!checkAndConsumeLimit('video')) return;
+
+  const container = document.getElementById('video-result-container');
+  const renderBox = document.getElementById('video-rendering-box');
+  const spinner = document.getElementById('video-spinner');
+  const statusEl = document.getElementById('video-status-text');
+  const videoPlayer = document.getElementById('video-player');
+  const downloadBox = document.getElementById('video-download-box');
+
+  container.classList.remove('hidden');
+  renderBox.classList.remove('hidden');
+  spinner.classList.remove('hidden');
+  statusEl.className = 'text-xs text-purple-300';
+  statusEl.textContent = 'Подготовка и генерация видео...';
+  videoPlayer.classList.add('hidden');
+  downloadBox.classList.add('hidden');
+  btn.disabled = true;
+
+  try {
+    let url;
+    if (engine === 'demo') {
+      await new Promise(r => setTimeout(r, 1800));
+      url = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+    } else {
+      url = await generateGeminiVideo(prompt, apiKey, statusEl);
+    }
+    showGeneratedVideo(url, prompt);
+  } catch (err) {
+    refundLimit('video');
+    spinner.classList.add('hidden');
+    statusEl.className = 'text-xs text-rose-400 break-words';
+    statusEl.textContent = 'Ошибка: ' + (err.message || err);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function showGeneratedVideo(url, prompt) {
+  const renderBox = document.getElementById('video-rendering-box');
+  const videoPlayer = document.getElementById('video-player');
+  const downloadBox = document.getElementById('video-download-box');
+  const downloadLink = document.getElementById('video-download-link');
+
+  renderBox.classList.add('hidden');
+  videoPlayer.src = url;
+  videoPlayer.classList.remove('hidden');
+  downloadBox.classList.remove('hidden');
+  downloadLink.href = url;
+  videoPlayer.play().catch(() => {});
+  saveToGallery('video', url, prompt);
+}
+
+/* ===================== GALLERY ===================== */
+function galleryKey() {
+  return 'nevexona_gallery_' + (currentUser ? currentUser.email : 'guest');
+}
+
+function loadGallery() {
+  galleryData = [];
+  try { galleryData = JSON.parse(localStorage.getItem(galleryKey())) || []; } catch(e) {}
+  renderGallery();
+}
+
+function saveToGallery(type, url, prompt) {
+  // Keep blob urls in memory for current session, but only persist non-blob
+  galleryData.unshift({ type, url, prompt, id: Date.now() });
+  galleryData = galleryData.slice(0, 40);
+  try {
+    const persistable = galleryData.filter(i => !i.url.startsWith('blob:'));
+    localStorage.setItem(galleryKey(), JSON.stringify(persistable));
+  } catch (e) {}
+  renderGallery();
+}
+
+function renderGallery() {
+  const grid = document.getElementById('gallery-grid');
+  const empty = document.getElementById('gallery-empty');
+  if (galleryData.length === 0) {
+    empty.classList.remove('hidden');
+    grid.innerHTML = '';
+    return;
+  }
+  empty.classList.add('hidden');
+  grid.innerHTML = galleryData.map(item => `
+    <div class="glass rounded-xl overflow-hidden border border-slate-800">
+      <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener" class="h-28 bg-slate-950 flex items-center justify-center overflow-hidden block">
+        ${item.type === 'image'
+          ? `<img src="${escapeHtml(item.url)}" class="w-full h-full object-cover" loading="lazy">`
+          : `<video src="${escapeHtml(item.url)}" class="w-full h-full object-cover" muted></video>`}
+      </a>
+      <div class="p-2">
+        <p class="text-[10px] text-slate-300 truncate">${escapeHtml(item.prompt)}</p>
+      </div>
+    </div>
+  `).join('');
+}
+
+function clearGallery() {
+  if (!currentUser || !confirm('Очистить галерею?')) return;
+  galleryData = [];
+  localStorage.removeItem(galleryKey());
+  renderGallery();
+}
+
+/* ===================== SETTINGS ===================== */
+function renderSettings() {
+  if (!currentUser) return;
+  const u = currentUser, unl = u.role === 'admin';
+  document.getElementById('set-acc-email').textContent = u.email;
+  document.getElementById('set-name').value = u.name || '';
+  const row = (l, a, m) => `<div class="flex justify-between py-2 border-b border-slate-800/70 last:border-0 text-xs"><span class="text-slate-400">${l}</span><span class="text-slate-100">${unl ? 'Без лимита' : a + ' из ' + m}</span></div>`;
+  document.getElementById('set-usage').innerHTML = row('Чат', u.usedChat, u.maxChat) + row('Фото', u.usedImg, u.maxImg) + row('Видео', u.usedVideo, u.maxVideo);
+  document.getElementById('set-delete').style.display = unl ? 'none' : '';
+}
+
+function saveProfileName() {
+  const name = document.getElementById('set-name').value.trim();
+  if (!name) { alert('Введите имя'); return; }
+  currentUser.name = name;
+  saveDB();
+  ['user-display-name', 'drawer-user-name'].forEach(id => { document.getElementById(id).innerText = name; });
+  ['user-avatar', 'drawer-avatar'].forEach(id => { document.getElementById(id).innerText = name[0].toUpperCase(); });
+  logEvent('Имя изменено: ' + currentUser.email);
+  alert('Имя сохранено');
+}
+
+async function changePassword() {
+  const oldP = document.getElementById('set-pw-old').value;
+  const newP = document.getElementById('set-pw-new').value;
+  if (newP.length < 6) { alert('Новый пароль — минимум 6 символов'); return; }
+  if (currentUser.pw && (await hashPw(currentUser.email, oldP)) !== currentUser.pw) {
+    alert('Текущий пароль неверный');
+    return;
+  }
+  currentUser.pw = await hashPw(currentUser.email, newP);
+  saveDB();
+  logEvent('Пароль изменён: ' + currentUser.email);
+  document.getElementById('set-pw-old').value = '';
+  document.getElementById('set-pw-new').value = '';
+  alert('Пароль изменён');
+}
+
+function deleteMyAccount() {
+  if (isAdmin() || !confirm('Удалить аккаунт навсегда?')) return;
+  const email = currentUser.email;
+  usersDB = usersDB.filter(u => u.email !== email);
+  localStorage.removeItem('nevexona_gallery_' + email);
+  saveDB();
+  logEvent('Пользователь удалил аккаунт: ' + email);
+  handleLogout();
+}
+
+function saveApiKeys() {
+  if (!isAdmin()) return;
+  const gemini = document.getElementById('key-gemini').value.trim();
+  localStorage.setItem('nevexona_keys', JSON.stringify({ gemini }));
+  alert('API ключ сохранён!');
+}
+
+/* ===================== ADMIN ===================== */
+const BTN_CLS = 'px-2.5 py-1.5 rounded-lg border border-slate-700 text-[11px] text-slate-300 hover:bg-slate-800 transition';
+
+function requireAdmin() {
+  if (!isAdmin()) { alert('Нет доступа'); return false; }
+  return true;
+}
+
+function findUser(email) {
+  return usersDB.find(u => u.email === email);
+}
+
+function renderAdminSettings() {
+  document.getElementById('set-reg').checked = settings.allowReg;
+  document.getElementById('set-maint').checked = settings.maintenance;
+  ['chat', 'img', 'video'].forEach(k => {
+    document.getElementById('set-f-' + k).checked = settings.features[k] !== false;
+    document.getElementById('def-' + k).value = settings.defaults[k];
+  });
+  document.getElementById('set-banner').value = settings.banner || '';
+}
+
+function renderAdminPanel() {
+  if (!isAdmin()) return;
+  const sum = k => usersDB.reduce((acc, u) => acc + (u[k] || 0), 0);
+  document.getElementById('stat-users-count').innerText = usersDB.length;
+  document.getElementById('stat-chat-count').innerText = sum('usedChat');
+  document.getElementById('stat-img-count').innerText = sum('usedImg');
+  document.getElementById('stat-video-count').innerText = sum('usedVideo');
+
+  const q = (document.getElementById('admin-search').value || '').trim().toLowerCase();
+  const list = usersDB.filter(u => !q || u.email.includes(q) || (u.name || '').toLowerCase().includes(q));
+
+  const cell = (label, u, key, used) => `
+    <label class="block">
+      <span class="flex justify-between text-[10px] text-slate-500"><span>${label}</span><span>исп. ${used}</span></span>
+      <input type="number" min="0" value="${u[key]}" data-email="${escapeHtml(u.email)}" onchange="adminSetLimit(this, '${key}')" class="mt-1 w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white">
+    </label>`;
+
+  document.getElementById('admin-users-list').innerHTML = list.length ? list.map(u => {
+    const owner = u.email === ADMIN_EMAIL;
+    const status = owner ? 'Владелец' : (u.banned ? 'Заблокирован' : 'Активен');
+    const statusCls = owner ? 'text-indigo-300 border-indigo-500/30' : (u.banned ? 'text-rose-300 border-rose-500/30' : 'text-slate-400 border-slate-700');
+    const em = escapeHtml(u.email);
+    return `<div class="p-4 space-y-3">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0">
+          <p class="text-xs font-medium text-slate-100 truncate">${escapeHtml(u.name || '')}</p>
+          <p class="text-[10px] text-slate-500 truncate">${em}</p>
+        </div>
+        <span class="shrink-0 text-[10px] px-2 py-0.5 rounded border ${statusCls}">${status}</span>
+      </div>
+      ${owner ? '<p class="text-[11px] text-slate-500">Без ограничений</p>' : `
+        <div class="grid grid-cols-3 gap-2">
+          ${cell('Чат', u, 'maxChat', u.usedChat)}
+          ${cell('Фото', u, 'maxImg', u.usedImg)}
+          ${cell('Видео', u, 'maxVideo', u.usedVideo)}
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button data-email="${em}" onclick="adminResetUser(this.dataset.email)" class="${BTN_CLS}">Сбросить</button>
+          <button data-email="${em}" onclick="adminToggleBan(this.dataset.email)" class="${BTN_CLS}">${u.banned ? 'Разблокировать' : 'Заблокировать'}</button>
+          <button data-email="${em}" onclick="adminDeleteUser(this.dataset.email)" class="${BTN_CLS} !text-rose-400">Удалить</button>
+        </div>`}
+    </div>`;
+  }).join('') : '<p class="p-4 text-xs text-slate-500">Никого не найдено</p>';
+
+  document.getElementById('admin-log').innerHTML = logDB.length
+    ? logDB.map(l => `<div class="px-4 py-2 flex gap-3 text-[11px]"><span class="shrink-0 text-slate-500">${new Date(l.t).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span><span class="text-slate-300 break-words min-w-0">${escapeHtml(l.text)}</span></div>`).join('')
+    : '<p class="p-4 text-xs text-slate-500">Журнал пуст</p>';
+}
+
+function adminSetLimit(el, key) {
+  if (!requireAdmin()) return;
+  const u = findUser(el.dataset.email);
+  if (!u || u.email === ADMIN_EMAIL) return;
+  u[key] = Math.max(0, parseInt(el.value, 10) || 0);
+  saveDB();
+  logEvent('Лимит ' + key + ' = ' + u[key] + ' для ' + u.email);
+  renderAdminPanel();
+}
+
+function adminResetUser(email) {
+  if (!requireAdmin()) return;
+  const u = findUser(email);
+  if (!u) return;
+  u.usedChat = u.usedImg = u.usedVideo = 0;
+  saveDB();
+  logEvent('Сброшены счётчики: ' + email);
+  renderAdminPanel();
+}
+
+function adminToggleBan(email) {
+  if (!requireAdmin()) return;
+  const u = findUser(email);
+  if (!u || u.email === ADMIN_EMAIL) return;
+  u.banned = !u.banned;
+  saveDB();
+  logEvent((u.banned ? 'Заблокирован: ' : 'Разблокирован: ') + email);
+  renderAdminPanel();
+}
+
+function adminDeleteUser(email) {
+  if (!requireAdmin() || email === ADMIN_EMAIL || !confirm('Удалить ' + email + '?')) return;
+  usersDB = usersDB.filter(u => u.email !== email);
+  localStorage.removeItem('nevexona_gallery_' + email);
+  saveDB();
+  logEvent('Удалён: ' + email);
+  renderAdminPanel();
+}
+
+function adminResetAll() {
+  if (!requireAdmin() || !confirm('Сбросить счётчики у всех пользователей?')) return;
+  usersDB.forEach(u => { u.usedChat = u.usedImg = u.usedVideo = 0; });
+  saveDB();
+  logEvent('Сброшены счётчики у всех');
+  updateUserLimitUI();
+  renderAdminPanel();
+}
+
+function adminToggle(key, value) {
+  if (!requireAdmin()) return;
+  if (key.startsWith('f:')) settings.features[key.slice(2)] = value;
+  else settings[key] = value;
+  saveSettings();
+  logEvent('Настройка ' + key + ': ' + (value ? 'вкл' : 'выкл'));
+  renderAdminPanel();
+}
+
+function adminSaveDefaults() {
+  if (!requireAdmin()) return;
+  ['chat', 'img', 'video'].forEach(k => {
+    settings.defaults[k] = Math.max(0, parseInt(document.getElementById('def-' + k).value, 10) || 0);
+  });
+  saveSettings();
+  logEvent('Лимиты для новых: ' + settings.defaults.chat + '/' + settings.defaults.img + '/' + settings.defaults.video);
+  renderAdminPanel();
+  alert('Сохранено');
+}
+
+function adminSaveBanner() {
+  if (!requireAdmin()) return;
+  settings.banner = document.getElementById('set-banner').value.trim();
+  saveSettings();
+  logEvent('Объявление обновлено');
+  applyRoleUI();
+  renderAdminPanel();
+}
+
+function adminClearBanner() {
+  document.getElementById('set-banner').value = '';
+  adminSaveBanner();
+}
+
+function adminClearLog() {
+  if (!requireAdmin()) return;
+  logDB = [];
+  localStorage.removeItem('nevexona_log');
+  renderAdminPanel();
+}
+
+function adminExport(kind) {
+  if (!requireAdmin()) return;
+  let text, type, name;
+  const safe = usersDB.map(({ pw, ...rest }) => rest);
+  if (kind === 'json') {
+    text = JSON.stringify(safe, null, 2);
+    type = 'application/json';
+    name = 'nevexona-users.json';
+  } else {
+    const cols = ['email', 'name', 'role', 'banned', 'usedChat', 'maxChat', 'usedImg', 'maxImg', 'usedVideo', 'maxVideo'];
+    text = [cols.join(',')].concat(safe.map(u => cols.map(c => JSON.stringify(u[c] ?? '')).join(','))).join('\n');
+    type = 'text/csv';
+    name = 'nevexona-users.csv';
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name;
+  a.click();
+  logEvent('Экспорт: ' + name);
+}
+
+function adminImport(input) {
+  if (!requireAdmin() || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const arr = JSON.parse(reader.result);
+      if (!Array.isArray(arr)) throw new Error('нужен массив');
+      let added = 0;
+      arr.forEach(r => {
+        if (!r || typeof r.email !== 'string' || findUser(r.email.toLowerCase())) return;
+        const num = (v, d) => Number.isFinite(+v) ? Math.max(0, +v) : d;
+        usersDB.push({
+          email: r.email.toLowerCase(),
+          name: String(r.name || r.email.split('@')[0]),
+          role: 'user',
+          banned: !!r.banned,
+          usedChat: num(r.usedChat, 0), maxChat: num(r.maxChat, settings.defaults.chat),
+          usedImg: num(r.usedImg, 0), maxImg: num(r.maxImg, settings.defaults.img),
+          usedVideo: num(r.usedVideo, 0), maxVideo: num(r.maxVideo, settings.defaults.video)
+        });
+        added++;
+      });
+      saveDB();
+      logEvent('Импорт: добавлено ' + added);
+      renderAdminPanel();
+      alert('Добавлено пользователей: ' + added);
+    } catch (err) {
+      alert('Ошибка импорта: ' + err.message);
+    }
+    input.value = '';
+  };
+  reader.readAsText(input.files[0]);
+}
+</script>
+</body>
+</html>
