@@ -159,6 +159,17 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
 .bar { height: 5px; border-radius: 9px; background: #1c130d; overflow: hidden; }
 .bar > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--neon), var(--neon-2)); box-shadow: 0 0 10px rgba(255,122,24,.8); transition: width .3s; }
 .bar > div.full { background: #ff3b3b; box-shadow: 0 0 10px rgba(255,59,59,.8); }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tile { border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; background: rgba(255,122,24,.05); }
+.tile b { display: block; font-size: 20px; color: var(--neon); text-shadow: var(--neon-glow); }
+.tile span { font-size: 11px; color: var(--muted); }
+.chk { flex-direction: row !important; align-items: center; gap: 8px !important; font-size: 13px !important; color: var(--text) !important; }
+.chk input { width: 16px; height: 16px; accent-color: var(--neon); }
+.banner { padding: 8px 16px; font-size: 12px; text-align: center; color: #1a0e05; background: linear-gradient(90deg, var(--neon), var(--neon-2)); box-shadow: 0 0 18px rgba(255,122,24,.45); }
+.btnrow { display: flex; flex-wrap: wrap; gap: 8px; }
+.btnrow .ghost { width: auto; padding: 8px 12px; }
+.danger { color: #ff7a7a; }
 
 /* ---------- Modal ---------- */
 .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.7); backdrop-filter: blur(4px); display: none; place-items: center; z-index: 50; padding: 16px; }
@@ -199,6 +210,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
       <div class="limit-row"><span>Сообщения сегодня</span><b id="limText">0/30</b></div>
       <div class="bar"><div id="limBar"></div></div>
     </div>
+    <button class="ghost" id="adminBtn">🛡 Админ-панель</button>
     <button class="ghost" id="openSettings">⚙ Настройки</button>
     <button class="ghost" id="exportBtn">⇩ Экспорт чатов</button>
   </div>
@@ -214,6 +226,8 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     <button class="icon-btn" id="speakBtn" title="Озвучивать ответы">🔇</button>
     <select class="model" id="model" title="Модель"></select>
   </header>
+
+  <div class="banner" id="banner" style="display:none"></div>
 
   <div class="messages" id="messages"><div class="wrap" id="wrap"></div></div>
 
@@ -238,13 +252,52 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     <label>Язык голоса
       <input id="setLang" placeholder="ru-RU">
     </label>
-    <label>Лимит сообщений в день (0 — без лимита)
-      <input id="setLimit" type="number" min="0" placeholder="30">
-    </label>
     <p class="hint">Всё работает без платных API: чат общается с Ollama на вашем компьютере. Чтобы страница с GitHub Pages могла подключиться, запустите Ollama с разрешением для сайта (см. README).</p>
     <div class="row">
       <button class="ghost" id="setCancel" style="width:auto;padding:9px 16px">Отмена</button>
       <button class="btn-new" id="setSave">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="adminBg">
+  <div class="modal" style="max-width:520px;max-height:92vh;overflow-y:auto">
+    <div class="stack" id="adminLogin">
+      <h2>Вход для владельца</h2>
+      <label>Логин
+        <input id="admUser" autocomplete="username" placeholder="Ник GitHub">
+      </label>
+      <label>Пароль
+        <input id="admPass" type="password" autocomplete="current-password">
+      </label>
+      <p class="hint err" id="admErr"></p>
+      <div class="row">
+        <button class="ghost" id="admCancel" style="width:auto;padding:9px 16px">Отмена</button>
+        <button class="btn-new" id="admEnter">Войти</button>
+      </div>
+    </div>
+    <div class="stack" id="adminPanel" style="display:none">
+      <h2>Админ-панель</h2>
+      <div class="stats">
+        <div class="tile"><b id="stToday">0</b><span>Сегодня</span></div>
+        <div class="tile"><b id="stChats">0</b><span>Чатов</span></div>
+        <div class="tile"><b id="stMsgs">0</b><span>Сообщений</span></div>
+      </div>
+      <label>Лимит сообщений в день (0 — без лимита)
+        <input id="admLimit" type="number" min="0" placeholder="30">
+      </label>
+      <label>Объявление сверху
+        <textarea id="admBanner" rows="2" placeholder="Текст появится над чатом"></textarea>
+      </label>
+      <label class="chk"><input type="checkbox" id="admMaint"> Режим техработ (чат отключён для всех, кроме админа)</label>
+      <div class="btnrow">
+        <button class="btn-new" id="admSave" style="width:auto;padding:9px 18px">Сохранить</button>
+        <button class="ghost" id="admReset">Сбросить счётчик</button>
+        <button class="ghost" id="admExport">Экспорт</button>
+        <button class="ghost danger" id="admWipe">Удалить все чаты</button>
+        <button class="ghost" id="admLogout">Выйти</button>
+      </div>
+      <p class="hint">Админ не ограничен лимитом. Изменения действуют в этом браузере.</p>
     </div>
   </div>
 </div>
@@ -378,6 +431,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     stopSpeak();
     if (tryCommand(text)) { elInput.value = ''; autosize(); return; }
     if (!model) { alert('Не выбрана модель. Запустите Ollama и скачайте модель, например: ollama pull qwen2.5'); return; }
+    if (cfg.maint && !isAdmin()) { alert('Идут технические работы. Попробуйте позже.'); return; }
     if (limitReached()) { alert('Дневной лимит исчерпан (' + getLimit() + ' сообщений). Он сбросится завтра, либо измените его в настройках.'); return; }
 
     var c = current();
@@ -429,6 +483,83 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     });
   }
 
+  /* ---------- Admin panel (works in this browser only) ---------- */
+  // Only a salted PBKDF2 hash is stored here, never the password itself.
+  // To change the login or password see README ("Админ-панель").
+  var ADMIN_USER = 'mr-profik1';
+  var ADMIN_SALT = 'nvx-neon-c2d1747e191e785d';
+  var ADMIN_HASH = 'd188189b2ca34e099c2a8cc296106a98874db233073042f7fbc937d00ded657a';
+  var ADMIN_ITER = 200000;
+  var failCount = 0, lockUntil = 0;
+
+  function isAdmin() { try { return sessionStorage.getItem('nvx_neon_admin') === '1'; } catch (e) { return false; } }
+  function hex(buf) { return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ('0' + b.toString(16)).slice(-2); }).join(''); }
+  function hashPass(p) {
+    var enc = new TextEncoder();
+    return crypto.subtle.importKey('raw', enc.encode(p), 'PBKDF2', false, ['deriveBits']).then(function (k) {
+      return crypto.subtle.deriveBits({ name: 'PBKDF2', salt: enc.encode(ADMIN_SALT), iterations: ADMIN_ITER, hash: 'SHA-256' }, k, 256);
+    }).then(hex);
+  }
+  function saveCfg() { try { localStorage.setItem(LS.cfg, JSON.stringify(cfg)); } catch (e) {} }
+  function paintBanner() {
+    var b = $('banner'); b.textContent = cfg.banner || ''; b.style.display = cfg.banner ? 'block' : 'none';
+  }
+  function showAdmin(auth) {
+    $('adminLogin').style.display = auth ? 'none' : 'flex';
+    $('adminPanel').style.display = auth ? 'flex' : 'none';
+    if (auth) fillAdmin(); else { $('admPass').value = ''; $('admErr').textContent = ''; }
+  }
+  function openAdmin() { closeSide(); $('adminBg').classList.add('open'); showAdmin(isAdmin()); }
+  function fillAdmin() {
+    var total = 0; chats.forEach(function (c) { total += c.messages.length; });
+    $('stToday').textContent = getUse().n;
+    $('stChats').textContent = chats.length;
+    $('stMsgs').textContent = total;
+    $('admLimit').value = getLimit();
+    $('admBanner').value = cfg.banner || '';
+    $('admMaint').checked = !!cfg.maint;
+  }
+  function adminEnter() {
+    var now = Date.now();
+    if (now < lockUntil) { $('admErr').textContent = 'Слишком много попыток. Подождите ' + Math.ceil((lockUntil - now) / 1000) + ' с.'; return; }
+    if (!window.crypto || !crypto.subtle) { $('admErr').textContent = 'Нужен защищённый контекст (https или localhost).'; return; }
+    var u = $('admUser').value.trim().toLowerCase(), p = $('admPass').value;
+    hashPass(p).then(function (h) {
+      if (u === ADMIN_USER && h === ADMIN_HASH) {
+        failCount = 0;
+        try { sessionStorage.setItem('nvx_neon_admin', '1'); } catch (e) {}
+        showAdmin(true); paintLimit();
+      } else {
+        failCount++;
+        if (failCount >= 5) { lockUntil = Date.now() + 60000; failCount = 0; }
+        $('admErr').textContent = 'Неверный логин или пароль.';
+      }
+    });
+  }
+  function adminSave() {
+    var lim = parseInt($('admLimit').value, 10);
+    cfg.limit = (isNaN(lim) || lim < 0) ? 30 : lim;
+    cfg.banner = $('admBanner').value.trim();
+    cfg.maint = $('admMaint').checked;
+    saveCfg(); paintBanner(); paintLimit(); fillAdmin();
+  }
+  $('adminBtn').onclick = openAdmin;
+  $('admEnter').onclick = adminEnter;
+  $('admPass').addEventListener('keydown', function (e) { if (e.key === 'Enter') adminEnter(); });
+  $('admCancel').onclick = function () { $('adminBg').classList.remove('open'); };
+  $('adminBg').onclick = function (e) { if (e.target === this) this.classList.remove('open'); };
+  $('admSave').onclick = adminSave;
+  $('admReset').onclick = function () { try { localStorage.removeItem('nvx_neon_use'); } catch (e) {} paintLimit(); fillAdmin(); };
+  $('admExport').onclick = function () { $('exportBtn').click(); };
+  $('admWipe').onclick = function () {
+    if (!confirm('Удалить все чаты в этом браузере? Это нельзя отменить.')) return;
+    chats = []; curId = null; save(); renderAll(); fillAdmin();
+  };
+  $('admLogout').onclick = function () {
+    try { sessionStorage.removeItem('nvx_neon_admin'); } catch (e) {}
+    showAdmin(false); paintLimit();
+  };
+
   /* ---------- Daily message limit (stored in this browser only) ---------- */
   function getLimit() { return typeof cfg.limit === 'number' && cfg.limit >= 0 ? cfg.limit : 30; }
   function dayKey() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
@@ -437,7 +568,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     if (!u || u.date !== dayKey()) u = { date: dayKey(), n: 0 };
     return u;
   }
-  function limitReached() { var l = getLimit(); return l > 0 && getUse().n >= l; }
+  function limitReached() { if (isAdmin()) return false; var l = getLimit(); return l > 0 && getUse().n >= l; }
   function addUse() {
     var u = getUse(); u.n++;
     try { localStorage.setItem('nvx_neon_use', JSON.stringify(u)); } catch (e) {}
@@ -586,8 +717,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
   $('model').onchange = function () { localStorage.setItem(LS.model, this.value); };
 
   $('openSettings').onclick = function () {
-    $('setUrl').value = cfg.url; $('setSystem').value = cfg.system; $('setLang').value = cfg.lang || 'ru-RU'; $('setLimit').value = getLimit();
-    $('modalBg').classList.add('open'); closeSide();
+    $('setUrl').value = cfg.url; $('setSystem').value = cfg.system; $('setLang').value = cfg.lang || 'ru-RU';    $('modalBg').classList.add('open'); closeSide();
   };
   $('setCancel').onclick = function () { $('modalBg').classList.remove('open'); };
   $('modalBg').onclick = function (e) { if (e.target === this) this.classList.remove('open'); };
@@ -595,9 +725,6 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     cfg.url = $('setUrl').value.trim() || 'http://localhost:11434';
     cfg.system = $('setSystem').value.trim() || DEFAULT_SYSTEM;
     cfg.lang = $('setLang').value.trim() || 'ru-RU';
-    var lim = parseInt($('setLimit').value, 10);
-    cfg.limit = (isNaN(lim) || lim < 0) ? 30 : lim;
-    paintLimit();
     try { localStorage.setItem(LS.cfg, JSON.stringify(cfg)); } catch (e) {}
     $('modalBg').classList.remove('open');
     loadModels();
@@ -614,6 +741,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
   if (!curId && chats[0]) curId = chats[0].id;
   renderAll();
   paintLimit();
+  paintBanner();
   loadModels();
 })();
 </script>
