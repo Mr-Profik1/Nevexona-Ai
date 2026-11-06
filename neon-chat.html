@@ -143,6 +143,17 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
 .send:hover { box-shadow: 0 0 28px rgba(255,122,24,.85); }
 .send.stop { background: #ff3b3b; box-shadow: 0 0 18px rgba(255,59,59,.5); color: #fff; }
 
+.icon-btn {
+  width: 38px; height: 38px; border-radius: 11px; flex-shrink: 0; font-size: 17px;
+  border: 1px solid var(--line); background: #0d0906; transition: .15s;
+}
+.icon-btn:hover { border-color: var(--neon); box-shadow: var(--box-glow); }
+.icon-btn.on { border-color: var(--neon); box-shadow: var(--box-glow); }
+.mic { width: 46px; height: 44px; border-radius: 14px; flex-shrink: 0; font-size: 18px; border: 1px solid var(--line); background: #0d0906; transition: .15s; }
+.mic:hover { border-color: var(--neon); box-shadow: var(--box-glow); }
+.mic.on { background: #ff3b3b; border-color: #ff3b3b; box-shadow: 0 0 20px rgba(255,59,59,.7); animation: pulse 1s infinite; }
+.bubble a { color: var(--neon-2); }
+
 /* ---------- Modal ---------- */
 .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.7); backdrop-filter: blur(4px); display: none; place-items: center; z-index: 50; padding: 16px; }
 .modal-bg.open { display: grid; }
@@ -190,6 +201,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     <span class="status-dot" id="dot"></span>
     <span class="title" id="statusText">Проверка Ollama…</span>
     <span class="spacer"></span>
+    <button class="icon-btn" id="speakBtn" title="Озвучивать ответы">🔇</button>
     <select class="model" id="model" title="Модель"></select>
   </header>
 
@@ -198,6 +210,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
   <div class="composer">
     <form id="form">
       <textarea id="input" rows="1" placeholder="Напишите сообщение…  (Enter — отправить, Shift+Enter — новая строка)"></textarea>
+      <button type="button" class="mic" id="micBtn" title="Голосовой ввод">🎤</button>
       <button type="submit" class="send" id="sendBtn" title="Отправить">➤</button>
     </form>
   </div>
@@ -211,6 +224,9 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     </label>
     <label>Системный промпт
       <textarea id="setSystem" rows="3" placeholder="Ты Nevexona AI, дружелюбный помощник. Отвечай на языке пользователя."></textarea>
+    </label>
+    <label>Язык голоса
+      <input id="setLang" placeholder="ru-RU">
     </label>
     <p class="hint">Всё работает без платных API: чат общается с Ollama на вашем компьютере. Чтобы страница с GitHub Pages могла подключиться, запустите Ollama с разрешением для сайта (см. README).</p>
     <div class="row">
@@ -346,6 +362,8 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     var text = elInput.value.trim();
     var model = $('model').value;
     if (!text) return;
+    stopSpeak();
+    if (tryCommand(text)) { elInput.value = ''; autosize(); return; }
     if (!model) { alert('Не выбрана модель. Запустите Ollama и скачайте модель, например: ollama pull qwen2.5'); return; }
 
     var c = current();
@@ -391,11 +409,132 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
       out.innerHTML = (acc ? render(acc) + '<br><br>' : '') + '<span class="err">Не удалось связаться с Ollama. Проверьте, что он запущен, и адрес в настройках.</span>';
     }).then(function () {
       out.classList.remove('cursor');
-      if (acc) { c.messages.push({ role: 'assistant', content: acc }); save(); }
+      if (acc) { c.messages.push({ role: 'assistant', content: acc }); save(); speak(acc); }
       else if (!out.querySelector('.err')) { out.innerHTML = '<span class="err">Пустой ответ.</span>'; }
       setBusy(false); abortCtl = null;
     });
   }
+
+  /* ---------- Voice: speech to text and text to speech ---------- */
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var rec = null, listening = false, heard = false;
+  var speakOn = localStorage.getItem('nvx_neon_speak') === '1';
+
+  function paintSpeak() { $('speakBtn').textContent = speakOn ? '🔊' : '🔇'; $('speakBtn').classList.toggle('on', speakOn); }
+  function stopSpeak() { if (window.speechSynthesis) window.speechSynthesis.cancel(); }
+  function speak(text, force) {
+    if ((!speakOn && !force) || !window.speechSynthesis) return;
+    stopSpeak();
+    var clean = String(text).replace(/```[\s\S]*?```/g, ' фрагмент кода пропущен ').replace(/[`*#_>]/g, '');
+    var u = new SpeechSynthesisUtterance(clean.slice(0, 1500));
+    u.lang = cfg.lang || 'ru-RU';
+    window.speechSynthesis.speak(u);
+  }
+  function toggleMic() {
+    if (!SR) { alert('Этот браузер не поддерживает распознавание речи. Откройте чат в Chrome или Edge.'); return; }
+    if (listening) { rec.stop(); return; }
+    stopSpeak();
+    heard = false;
+    rec = new SR();
+    rec.lang = cfg.lang || 'ru-RU';
+    rec.interimResults = true;
+    rec.continuous = false;
+    rec.onstart = function () { listening = true; $('micBtn').classList.add('on'); };
+    rec.onresult = function (e) {
+      var t = '';
+      for (var i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
+      heard = true; elInput.value = t; autosize();
+    };
+    rec.onerror = function (e) {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') alert('Разрешите доступ к микрофону в настройках браузера для этого сайта.');
+    };
+    rec.onend = function () {
+      listening = false; $('micBtn').classList.remove('on');
+      if (heard && elInput.value.trim() && !busy) send();
+    };
+    try { rec.start(); } catch (e) {}
+  }
+
+  /* ---------- Voice and text commands (work inside the browser) ---------- */
+  var SITES = {
+    'ютуб': 'https://www.youtube.com', 'youtube': 'https://www.youtube.com',
+    'гугл': 'https://www.google.com', 'google': 'https://www.google.com',
+    'вк': 'https://vk.com', 'вконтакте': 'https://vk.com',
+    'телеграм': 'https://web.telegram.org', 'telegram': 'https://web.telegram.org',
+    'почту': 'https://mail.google.com', 'почта': 'https://mail.google.com', 'gmail': 'https://mail.google.com',
+    'карты': 'https://maps.google.com', 'maps': 'https://maps.google.com',
+    'гитхаб': 'https://github.com', 'github': 'https://github.com',
+    'википедию': 'https://ru.wikipedia.org', 'википедия': 'https://ru.wikipedia.org', 'wikipedia': 'https://wikipedia.org'
+  };
+  function beep() {
+    try {
+      var A = window.AudioContext || window.webkitAudioContext, ctx = new A(), o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = 880; g.gain.value = 0.15; o.connect(g); g.connect(ctx.destination); o.start();
+      setTimeout(function () { o.stop(); ctx.close(); }, 700);
+    } catch (e) {}
+  }
+  function lastAnswer() {
+    var c = current(); if (!c) return '';
+    for (var i = c.messages.length - 1; i >= 0; i--) if (c.messages[i].role === 'assistant') return c.messages[i].content;
+    return '';
+  }
+  function tryCommand(raw) {
+    var t = raw.toLowerCase().replace(/[.!?,\s]+$/, '').trim(), m;
+    function done(html, plain) {
+      if (elWrap.querySelector('.empty')) elWrap.innerHTML = '';
+      bubble('user', esc(raw));
+      bubble('ai', html);
+      speak(plain || html.replace(/<[^>]+>/g, ''));
+      return true;
+    }
+    function link(url) { return '<a href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(url) + '</a>'; }
+
+    if ((m = t.match(/^(?:открой|открыть|запусти|open)\s+(?:сайт\s+)?(.+)$/))) {
+      var key = m[1].trim(), url = SITES[key] || (/^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(key) ? 'https://' + key : null);
+      if (url) { window.open(url, '_blank', 'noopener'); return done('Открываю ' + link(url) + '<br><small>Если вкладка не открылась, нажмите на ссылку.</small>', 'Открываю ' + key); }
+      return false;
+    }
+    if ((m = t.match(/^(?:найди|поищи|погугли|search)\s+(.+)$/))) {
+      var q = 'https://www.google.com/search?q=' + encodeURIComponent(m[1]);
+      window.open(q, '_blank', 'noopener');
+      return done('Ищу: ' + esc(m[1]) + '<br>' + link(q), 'Ищу ' + m[1]);
+    }
+    if ((m = t.match(/^(?:позвони|набери|call)\s+(?:на\s+)?(\+?[\d\s()-]{5,})$/))) {
+      var num = m[1].replace(/[^\d+]/g, '');
+      var tel = 'tel:' + num;
+      window.location.href = tel;
+      return done('Открываю набор номера ' + esc(num) + '. Нажмите «позвонить» в приложении.<br>' + link(tel), 'Набираю ' + num);
+    }
+    if ((m = t.match(/^(?:напиши смс|смс|sms)\s+(?:на\s+)?(\+?[\d\s()-]{5,}?)(?:\s+([^\d].*))?$/))) {
+      var n2 = m[1].replace(/[^\d+]/g, '');
+      var sms = 'sms:' + n2 + (m[2] ? '?body=' + encodeURIComponent(m[2]) : '');
+      window.location.href = sms;
+      return done('Открываю сообщение для ' + esc(n2) + '. Отправить нужно вручную.<br>' + link(sms), 'Готовлю сообщение');
+    }
+    if ((m = t.match(/(?:таймер|засеки|timer).*?(\d+)\s*(секунд|сек|минут|мин|час)/))) {
+      var k = parseInt(m[1], 10), u = m[2], ms = k * (u.indexOf('сек') === 0 ? 1000 : u.indexOf('мин') === 0 ? 60000 : 3600000);
+      if (ms > 0 && ms <= 86400000) {
+        setTimeout(function () { beep(); speak('Таймер сработал', true); bubble('ai', '⏰ Таймер на ' + k + ' ' + esc(u) + ' сработал!'); }, ms);
+        return done('Таймер запущен: ' + k + ' ' + esc(u) + '. Страницу не закрывайте.', 'Таймер запущен');
+      }
+    }
+    if (/^(?:скопируй|copy)(?:\s+ответ)?$/.test(t)) {
+      var ans = lastAnswer();
+      if (!ans) return done('Пока нечего копировать.');
+      if (navigator.clipboard) navigator.clipboard.writeText(ans).catch(function () {});
+      return done('Последний ответ скопирован в буфер обмена.', 'Скопировано');
+    }
+    if (/^(?:новый чат|очисти чат)$/.test(t)) { if (!busy) newChat(); return true; }
+    return false;
+  }
+
+  $('micBtn').onclick = toggleMic;
+  $('speakBtn').onclick = function () {
+    speakOn = !speakOn; if (!speakOn) stopSpeak();
+    try { localStorage.setItem('nvx_neon_speak', speakOn ? '1' : '0'); } catch (e) {}
+    paintSpeak();
+  };
+  paintSpeak();
 
   /* ---------- UI wiring ---------- */
   function autosize() { elInput.style.height = 'auto'; elInput.style.height = Math.min(elInput.scrollHeight, 160) + 'px'; }
@@ -412,7 +551,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
   $('model').onchange = function () { localStorage.setItem(LS.model, this.value); };
 
   $('openSettings').onclick = function () {
-    $('setUrl').value = cfg.url; $('setSystem').value = cfg.system;
+    $('setUrl').value = cfg.url; $('setSystem').value = cfg.system; $('setLang').value = cfg.lang || 'ru-RU';
     $('modalBg').classList.add('open'); closeSide();
   };
   $('setCancel').onclick = function () { $('modalBg').classList.remove('open'); };
@@ -420,6 +559,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
   $('setSave').onclick = function () {
     cfg.url = $('setUrl').value.trim() || 'http://localhost:11434';
     cfg.system = $('setSystem').value.trim() || DEFAULT_SYSTEM;
+    cfg.lang = $('setLang').value.trim() || 'ru-RU';
     try { localStorage.setItem(LS.cfg, JSON.stringify(cfg)); } catch (e) {}
     $('modalBg').classList.remove('open');
     loadModels();
