@@ -153,6 +153,12 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
 .mic:hover { border-color: var(--neon); box-shadow: var(--box-glow); }
 .mic.on { background: #ff3b3b; border-color: #ff3b3b; box-shadow: 0 0 20px rgba(255,59,59,.7); animation: pulse 1s infinite; }
 .bubble a { color: var(--neon-2); }
+.limit { padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,122,24,.05); font-size: 12px; }
+.limit-row { display: flex; justify-content: space-between; color: var(--muted); margin-bottom: 7px; }
+.limit-row b { color: var(--neon-2); font-weight: 600; }
+.bar { height: 5px; border-radius: 9px; background: #1c130d; overflow: hidden; }
+.bar > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--neon), var(--neon-2)); box-shadow: 0 0 10px rgba(255,122,24,.8); transition: width .3s; }
+.bar > div.full { background: #ff3b3b; box-shadow: 0 0 10px rgba(255,59,59,.8); }
 
 /* ---------- Modal ---------- */
 .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.7); backdrop-filter: blur(4px); display: none; place-items: center; z-index: 50; padding: 16px; }
@@ -189,6 +195,10 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
   <button class="btn-new" id="newChat">+ Новый чат</button>
   <div class="chats" id="chatList"></div>
   <div class="side-foot">
+    <div class="limit">
+      <div class="limit-row"><span>Сообщения сегодня</span><b id="limText">0/30</b></div>
+      <div class="bar"><div id="limBar"></div></div>
+    </div>
     <button class="ghost" id="openSettings">⚙ Настройки</button>
     <button class="ghost" id="exportBtn">⇩ Экспорт чатов</button>
   </div>
@@ -227,6 +237,9 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     </label>
     <label>Язык голоса
       <input id="setLang" placeholder="ru-RU">
+    </label>
+    <label>Лимит сообщений в день (0 — без лимита)
+      <input id="setLimit" type="number" min="0" placeholder="30">
     </label>
     <p class="hint">Всё работает без платных API: чат общается с Ollama на вашем компьютере. Чтобы страница с GitHub Pages могла подключиться, запустите Ollama с разрешением для сайта (см. README).</p>
     <div class="row">
@@ -365,6 +378,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     stopSpeak();
     if (tryCommand(text)) { elInput.value = ''; autosize(); return; }
     if (!model) { alert('Не выбрана модель. Запустите Ollama и скачайте модель, например: ollama pull qwen2.5'); return; }
+    if (limitReached()) { alert('Дневной лимит исчерпан (' + getLimit() + ' сообщений). Он сбросится завтра, либо измените его в настройках.'); return; }
 
     var c = current();
     if (!c) { newChat(); c = current(); }
@@ -409,10 +423,31 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
       out.innerHTML = (acc ? render(acc) + '<br><br>' : '') + '<span class="err">Не удалось связаться с Ollama. Проверьте, что он запущен, и адрес в настройках.</span>';
     }).then(function () {
       out.classList.remove('cursor');
-      if (acc) { c.messages.push({ role: 'assistant', content: acc }); save(); speak(acc); }
+      if (acc) { c.messages.push({ role: 'assistant', content: acc }); save(); speak(acc); addUse(); }
       else if (!out.querySelector('.err')) { out.innerHTML = '<span class="err">Пустой ответ.</span>'; }
       setBusy(false); abortCtl = null;
     });
+  }
+
+  /* ---------- Daily message limit (stored in this browser only) ---------- */
+  function getLimit() { return typeof cfg.limit === 'number' && cfg.limit >= 0 ? cfg.limit : 30; }
+  function dayKey() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  function getUse() {
+    var u = load('nvx_neon_use', null);
+    if (!u || u.date !== dayKey()) u = { date: dayKey(), n: 0 };
+    return u;
+  }
+  function limitReached() { var l = getLimit(); return l > 0 && getUse().n >= l; }
+  function addUse() {
+    var u = getUse(); u.n++;
+    try { localStorage.setItem('nvx_neon_use', JSON.stringify(u)); } catch (e) {}
+    paintLimit();
+  }
+  function paintLimit() {
+    var l = getLimit(), n = getUse().n, bar = $('limBar');
+    $('limText').textContent = l > 0 ? n + '/' + l : n + ' · без лимита';
+    bar.style.width = l > 0 ? Math.min(100, n / l * 100) + '%' : '100%';
+    bar.classList.toggle('full', l > 0 && n >= l);
   }
 
   /* ---------- Voice: speech to text and text to speech ---------- */
@@ -551,7 +586,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
   $('model').onchange = function () { localStorage.setItem(LS.model, this.value); };
 
   $('openSettings').onclick = function () {
-    $('setUrl').value = cfg.url; $('setSystem').value = cfg.system; $('setLang').value = cfg.lang || 'ru-RU';
+    $('setUrl').value = cfg.url; $('setSystem').value = cfg.system; $('setLang').value = cfg.lang || 'ru-RU'; $('setLimit').value = getLimit();
     $('modalBg').classList.add('open'); closeSide();
   };
   $('setCancel').onclick = function () { $('modalBg').classList.remove('open'); };
@@ -560,6 +595,9 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     cfg.url = $('setUrl').value.trim() || 'http://localhost:11434';
     cfg.system = $('setSystem').value.trim() || DEFAULT_SYSTEM;
     cfg.lang = $('setLang').value.trim() || 'ru-RU';
+    var lim = parseInt($('setLimit').value, 10);
+    cfg.limit = (isNaN(lim) || lim < 0) ? 30 : lim;
+    paintLimit();
     try { localStorage.setItem(LS.cfg, JSON.stringify(cfg)); } catch (e) {}
     $('modalBg').classList.remove('open');
     loadModels();
@@ -575,6 +613,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
   if (curId && !current()) curId = chats[0] ? chats[0].id : null;
   if (!curId && chats[0]) curId = chats[0].id;
   renderAll();
+  paintLimit();
   loadModels();
 })();
 </script>
