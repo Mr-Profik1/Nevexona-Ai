@@ -479,6 +479,8 @@ summary { cursor: pointer; color: var(--neon-2); font-size: 13px; }
     if (webEngine && webModelId === id) return Promise.resolve(webEngine);
     if (!navigator.gpu) return Promise.reject(new Error('nogpu'));
     return import('https://esm.run/@mlc-ai/web-llm').then(function (w) {
+      var known = w.prebuiltAppConfig && w.prebuiltAppConfig.model_list;
+      if (known && !known.some(function (m) { return m.model_id === id; })) throw new Error('такой модели нет в списке WebLLM: ' + id);
       if (webEngine && webEngine.unload) { try { webEngine.unload(); } catch (e) {} }
       webEngine = null; webModelId = null;
       return w.CreateMLCEngine(id, { initProgressCallback: function (p) {
