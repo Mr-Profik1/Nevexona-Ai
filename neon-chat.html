@@ -225,7 +225,7 @@ summary { cursor: pointer; color: var(--neon-2); font-size: 13px; }
   <header class="topbar">
     <button class="menu-btn" id="menuBtn" aria-label="Меню">☰</button>
     <span class="status-dot" id="dot"></span>
-    <span class="title" id="statusText">Проверка Ollama…</span>
+    <span class="title" id="statusText">Запуск…</span>
     <span class="spacer"></span>
     <button class="icon-btn" id="speakBtn" title="Озвучивать ответы">🔇</button>
     <select class="model" id="model" title="Модель"></select>
@@ -247,7 +247,13 @@ summary { cursor: pointer; color: var(--neon-2); font-size: 13px; }
 <div class="modal-bg" id="modalBg">
   <div class="modal">
     <h2>Настройки</h2>
-    <label>Адрес Ollama
+    <label>Движок чата
+      <select id="setEngine" class="model" style="max-width:none">
+        <option value="web">ИИ в браузере (WebLLM, без сервера)</option>
+        <option value="ollama">Ollama (свой компьютер или сервер)</option>
+      </select>
+    </label>
+    <label>Адрес Ollama (только для режима Ollama)
       <input id="setUrl" placeholder="http://localhost:11434">
     </label>
     <label>Системный промпт
@@ -259,7 +265,7 @@ summary { cursor: pointer; color: var(--neon-2); font-size: 13px; }
     <label>Адрес Stable Diffusion WebUI (для фото)
       <input id="setSd" placeholder="http://127.0.0.1:7860">
     </label>
-    <p class="hint">Всё работает без платных API: чат общается с Ollama на вашем компьютере. Если чат открыт не с вашего компьютера, а с сайта, разрешите этому сайту доступ к Ollama (см. README).</p>
+    <p class="hint">Режим «в браузере» работает на телефоне без сервера и ключей: модель скачивается один раз и крутится на вашем устройстве (нужен Chrome с WebGPU, 3+ ГБ свободной памяти). Модели маленькие, отвечают слабее больших облачных ИИ.</p>
     <div class="row">
       <button class="ghost" id="setCancel" style="width:auto;padding:9px 16px">Отмена</button>
       <button class="btn-new" id="setSave">Сохранить</button>
@@ -373,7 +379,8 @@ summary { cursor: pointer; color: var(--neon-2); font-size: 13px; }
   'use strict';
   var LS = { chats: 'nvx_neon_chats', cur: 'nvx_neon_cur', cfg: 'nvx_neon_cfg', model: 'nvx_neon_model' };
   var DEFAULT_SYSTEM = 'Ты Nevexona AI, дружелюбный и точный помощник. Отвечай на языке пользователя.';
-  var cfg = load(LS.cfg, { url: 'http://localhost:11434', system: DEFAULT_SYSTEM });
+  var cfg = load(LS.cfg, { engine: 'web', url: 'http://localhost:11434', system: DEFAULT_SYSTEM });
+  if (!cfg.engine) cfg.engine = 'web';
   var chats = load(LS.chats, []);
   var curId = localStorage.getItem(LS.cur);
   var busy = false, abortCtl = null;
@@ -441,7 +448,7 @@ summary { cursor: pointer; color: var(--neon-2); font-size: 13px; }
     elWrap.innerHTML = '';
     var c = current();
     if (!c || !c.messages.length) {
-      elWrap.innerHTML = '<div class="empty"><div class="big">NEVEXONA</div><p>Ваш приватный ИИ-чат на оранжевом неоне. Модель работает на вашем компьютере через Ollama, без платных API.</p><div class="chips"></div></div>';
+      elWrap.innerHTML = '<div class="empty"><div class="big">NEVEXONA</div><p>Ваш приватный ИИ-чат на оранжевом неоне. Модель работает прямо в браузере вашего устройства, без ключей и платных API.</p><div class="chips"></div></div>';
       var chips = elWrap.querySelector('.chips');
       ['Объясни простыми словами, что такое нейросеть', 'Напиши функцию на Python для сортировки', 'Придумай название для кофейни'].forEach(function (t) {
         var b = document.createElement('button'); b.className = 'chip'; b.textContent = t;
@@ -459,7 +466,47 @@ summary { cursor: pointer; color: var(--neon-2); font-size: 13px; }
     $('dot').className = 'status-dot' + (on ? ' on' : '');
     $('statusText').textContent = text;
   }
+  /* ---------- AI in the browser (WebLLM, WebGPU) ---------- */
+  var WEB_MODELS = [
+    ['Qwen2.5-1.5B-Instruct-q4f16_1-MLC', 'Qwen2.5 1.5B (быстрая, ~1 ГБ)'],
+    ['Qwen2.5-3B-Instruct-q4f16_1-MLC', 'Qwen2.5 3B (умнее, ~2 ГБ)'],
+    ['Llama-3.2-3B-Instruct-q4f16_1-MLC', 'Llama 3.2 3B (~2 ГБ)'],
+    ['Phi-3.5-mini-instruct-q4f16_1-MLC', 'Phi-3.5 mini (много памяти)'],
+    ['Qwen2.5-0.5B-Instruct-q4f16_1-MLC', 'Qwen2.5 0.5B (самая лёгкая)']
+  ];
+  var webEngine = null, webModelId = null;
+  function ensureWeb(id) {
+    if (webEngine && webModelId === id) return Promise.resolve(webEngine);
+    if (!navigator.gpu) return Promise.reject(new Error('nogpu'));
+    return import('https://esm.run/@mlc-ai/web-llm').then(function (w) {
+      if (webEngine && webEngine.unload) { try { webEngine.unload(); } catch (e) {} }
+      webEngine = null; webModelId = null;
+      return w.CreateMLCEngine(id, { initProgressCallback: function (p) {
+        setStatus(false, 'Загрузка модели: ' + Math.round((p.progress || 0) * 100) + '% (один раз, потом из кэша)');
+      } });
+    }).then(function (e) { webEngine = e; webModelId = id; setStatus(true, 'ИИ в браузере готов'); return e; });
+  }
+  async function webChat(payload, model, onDelta) {
+    var e = await ensureWeb(model);
+    abortCtl.signal.addEventListener('abort', function () { try { e.interruptGenerate(); } catch (x) {} });
+    var stream = await e.chat.completions.create({ messages: payload, stream: true, temperature: 0.7 });
+    for await (var ch of stream) {
+      var d = ch.choices && ch.choices[0] && ch.choices[0].delta && ch.choices[0].delta.content;
+      if (d) onDelta(d);
+    }
+  }
+  function loadWebModels() {
+    var sel = $('model'); sel.innerHTML = '';
+    WEB_MODELS.forEach(function (m) { var o = document.createElement('option'); o.value = m[0]; o.textContent = m[1]; sel.appendChild(o); });
+    var saved = localStorage.getItem(LS.model);
+    if (saved && WEB_MODELS.some(function (m) { return m[0] === saved; })) sel.value = saved;
+    if (navigator.gpu) setStatus(true, 'ИИ в браузере · модель скачается при первом сообщении');
+    else setStatus(false, 'Нет WebGPU: откройте в свежем Chrome (Android 121+) или выберите режим Ollama');
+    return Promise.resolve();
+  }
+
   function loadModels() {
+    if (cfg.engine !== 'ollama') return loadWebModels();
     setStatus(false, 'Проверка Ollama…');
     return fetch(baseUrl() + '/api/tags').then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -496,7 +543,7 @@ summary { cursor: pointer; color: var(--neon-2); font-size: 13px; }
     if (!text) return;
     stopSpeak();
     if (tryCommand(text)) { elInput.value = ''; autosize(); return; }
-    if (!model) { alert('Не выбрана модель. Запустите Ollama и скачайте модель, например: ollama pull qwen2.5'); return; }
+    if (!model) { alert('Не выбрана модель. В режиме Ollama запустите его и скачайте модель, например: ollama pull qwen2.5'); return; }
     if (cfg.maint && !isAdmin()) { alert('Идут технические работы. Попробуйте позже.'); return; }
     if (limitReached()) { alert('Дневной лимит исчерпан (' + getLimit() + ' сообщений). Он сбросится завтра, либо измените его в настройках.'); return; }
 
@@ -514,7 +561,9 @@ summary { cursor: pointer; color: var(--neon-2); font-size: 13px; }
     abortCtl = new AbortController();
     setBusy(true);
 
-    fetch(baseUrl() + '/api/chat', {
+    var job = cfg.engine !== 'ollama' ? webChat(payload, model, function (d) {
+      acc += d; out.innerHTML = render(acc); elMsgs.scrollTop = elMsgs.scrollHeight;
+    }) : fetch(baseUrl() + '/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: model, messages: payload, stream: true }),
@@ -538,9 +587,13 @@ summary { cursor: pointer; color: var(--neon-2); font-size: 13px; }
         });
       }
       return pump();
-    }).catch(function (e) {
+    });
+    job.catch(function (e) {
       if (e && e.name === 'AbortError') return;
-      out.innerHTML = (acc ? render(acc) + '<br><br>' : '') + '<span class="err">Не удалось связаться с Ollama. Проверьте, что он запущен, и адрес в настройках.</span>';
+      var msg = cfg.engine !== 'ollama'
+        ? (e && e.message === 'nogpu' ? 'Браузер не поддерживает WebGPU. Откройте сайт в свежем Chrome на Android или выберите режим Ollama в настройках.' : 'Не удалось запустить модель в браузере (' + esc(e && e.message || e) + '). Попробуйте модель поменьше.')
+        : 'Не удалось связаться с Ollama. Проверьте, что он запущен, и адрес в настройках.';
+      out.innerHTML = (acc ? render(acc) + '<br><br>' : '') + '<span class="err">' + msg + '</span>';
     }).then(function () {
       out.classList.remove('cursor');
       if (acc) { c.messages.push({ role: 'assistant', content: acc }); save(); speak(acc); addUse(); }
@@ -935,11 +988,12 @@ summary { cursor: pointer; color: var(--neon-2); font-size: 13px; }
   $('model').onchange = function () { localStorage.setItem(LS.model, this.value); };
 
   $('openSettings').onclick = function () {
-    $('setUrl').value = cfg.url; $('setSystem').value = cfg.system; $('setLang').value = cfg.lang || 'ru-RU'; $('setSd').value = cfg.sdUrl || 'http://127.0.0.1:7860';    $('modalBg').classList.add('open'); closeSide();
+    $('setEngine').value = cfg.engine || 'web'; $('setUrl').value = cfg.url; $('setSystem').value = cfg.system; $('setLang').value = cfg.lang || 'ru-RU'; $('setSd').value = cfg.sdUrl || 'http://127.0.0.1:7860';    $('modalBg').classList.add('open'); closeSide();
   };
   $('setCancel').onclick = function () { $('modalBg').classList.remove('open'); };
   $('modalBg').onclick = function (e) { if (e.target === this) this.classList.remove('open'); };
   $('setSave').onclick = function () {
+    cfg.engine = $('setEngine').value === 'ollama' ? 'ollama' : 'web';
     cfg.url = $('setUrl').value.trim() || 'http://localhost:11434';
     cfg.system = $('setSystem').value.trim() || DEFAULT_SYSTEM;
     cfg.lang = $('setLang').value.trim() || 'ru-RU';
