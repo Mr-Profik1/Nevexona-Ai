@@ -170,6 +170,8 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
 .btnrow { display: flex; flex-wrap: wrap; gap: 8px; }
 .btnrow .ghost { width: auto; padding: 8px 12px; }
 .danger { color: #ff7a7a; }
+details { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+summary { cursor: pointer; color: var(--neon-2); font-size: 13px; }
 
 /* ---------- Modal ---------- */
 .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.7); backdrop-filter: blur(4px); display: none; place-items: center; z-index: 50; padding: 16px; }
@@ -211,6 +213,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
       <div class="bar"><div id="limBar"></div></div>
     </div>
     <button class="ghost" id="photoBtn">🖼 Генерация фото</button>
+    <button class="ghost" id="videoBtn">🎬 Генерация видео</button>
     <button class="ghost" id="adminBtn">🛡 Админ-панель</button>
     <button class="ghost" id="openSettings">⚙ Настройки</button>
     <button class="ghost" id="exportBtn">⇩ Экспорт чатов</button>
@@ -291,6 +294,34 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     <div class="row">
       <button class="ghost" id="phClose" style="width:auto;padding:9px 16px">Закрыть</button>
       <button class="btn-new" id="phGo">Создать</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="videoBg">
+  <div class="modal" style="max-width:560px;max-height:92vh;overflow-y:auto">
+    <h2>Генерация видео</h2>
+    <label>Описание
+      <textarea id="vdPrompt" rows="3" placeholder="Оранжевый неоновый город ночью, камера медленно летит вперёд"></textarea>
+    </label>
+    <details id="vdSetup">
+      <summary>Настройка ComfyUI (один раз)</summary>
+      <div class="stack" style="margin-top:10px">
+        <label>Адрес ComfyUI
+          <input id="vdUrl" placeholder="http://127.0.0.1:8188">
+        </label>
+        <label>Workflow в формате API (JSON)
+          <textarea id="vdWf" rows="6" placeholder="Вставьте JSON из ComfyUI: Save (API Format)"></textarea>
+        </label>
+        <p class="hint">Откройте в ComfyUI шаблон видео (Workflow → Browse Templates, например LTX-Video), включите Dev mode в настройках и выберите Save (API Format). Вставьте файл сюда. Описание подставится само, либо впишите в текст промпта метку двойных фигурных скобок со словом prompt.</p>
+      </div>
+    </details>
+    <p class="hint err" id="vdErr"></p>
+    <p class="hint" id="vdStatus"></p>
+    <div id="vdOut" class="stack"></div>
+    <div class="row">
+      <button class="ghost" id="vdClose" style="width:auto;padding:9px 16px">Закрыть</button>
+      <button class="btn-new" id="vdGo">Создать</button>
     </div>
   </div>
 </div>
@@ -657,6 +688,116 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
   $('phClose').onclick = function () { $('photoBg').classList.remove('open'); };
   $('photoBg').onclick = function (e) { if (e.target === this) this.classList.remove('open'); };
   $('phGo').onclick = genPhoto;
+
+  /* ---------- Video generation (through your local ComfyUI) ---------- */
+  function comfyUrl() { return (cfg.comfyUrl || 'http://127.0.0.1:8188').replace(/\/+$/, ''); }
+  function vdBusy(b) { $('vdGo').disabled = b; $('vdGo').textContent = b ? 'Генерирую…' : 'Создать'; }
+  function vdErr(t) { $('vdErr').textContent = t || ''; }
+
+  function prepareWorkflow(text, prompt) {
+    var wf = JSON.parse(text), replaced = false;
+    var str = JSON.stringify(wf);
+    if (str.indexOf('{{prompt}}') >= 0) {
+      str = str.split('{{prompt}}').join(JSON.stringify(prompt).slice(1, -1));
+      wf = JSON.parse(str); replaced = true;
+    }
+    if (!replaced) {
+      var target = null;
+      Object.keys(wf).some(function (id) {
+        var inp = wf[id] && wf[id].inputs;
+        if (!inp || !Array.isArray(inp.positive)) return false;
+        var src = wf[String(inp.positive[0])];
+        if (src && src.class_type === 'CLIPTextEncode' && src.inputs && typeof src.inputs.text === 'string') { target = src; return true; }
+        return false;
+      });
+      if (!target) throw new Error('noprompt');
+      target.inputs.text = prompt;
+    }
+    Object.keys(wf).forEach(function (id) {
+      var inp = wf[id] && wf[id].inputs; if (!inp) return;
+      ['seed', 'noise_seed'].forEach(function (k) {
+        if (typeof inp[k] === 'number') inp[k] = Math.floor(Math.random() * 1e15);
+      });
+    });
+    return wf;
+  }
+  function pollVideo(id) {
+    var started = Date.now();
+    return new Promise(function (resolve, reject) {
+      (function tick() {
+        if (Date.now() - started > 1200000) { reject(new Error('Время ожидания (20 минут) вышло.')); return; }
+        fetch(comfyUrl() + '/history/' + encodeURIComponent(id)).then(function (r) { return r.json(); }).then(function (h) {
+          var e = h[id];
+          if (e && e.status && e.status.status_str === 'error') { reject(new Error('ComfyUI сообщил об ошибке при генерации. Посмотрите окно ComfyUI.')); return; }
+          if (e && e.outputs && Object.keys(e.outputs).length) { resolve(e.outputs); return; }
+          $('vdStatus').textContent = 'Генерирую… ' + Math.round((Date.now() - started) / 1000) + ' с (видео может занять несколько минут)';
+          setTimeout(tick, 2000);
+        }).catch(reject);
+      })();
+    });
+  }
+  function showVideo(outputs) {
+    var list = null;
+    ['videos', 'gifs', 'images'].some(function (t) {
+      var arr = [];
+      Object.keys(outputs).forEach(function (k) {
+        (outputs[k][t] || []).forEach(function (f) { if (f.type !== 'temp') arr.push(f); });
+      });
+      if (arr.length) { list = arr; return true; }
+      return false;
+    });
+    if (!list) throw new Error('ComfyUI не вернул видеофайл. Проверьте, что в workflow есть узел сохранения видео.');
+    var f = list[list.length - 1];
+    var url = comfyUrl() + '/view?filename=' + encodeURIComponent(f.filename) + '&subfolder=' + encodeURIComponent(f.subfolder || '') + '&type=' + encodeURIComponent(f.type || 'output');
+    var style = 'width:100%;border-radius:12px;border:1px solid var(--line)';
+    var media = /\.(mp4|webm|mov|mkv)$/i.test(f.filename)
+      ? '<video controls autoplay loop playsinline src="' + esc(url) + '" style="' + style + '"></video>'
+      : '<img alt="Результат" src="' + esc(url) + '" style="' + style + '">';
+    $('vdOut').innerHTML = media + '<a class="ghost" href="' + esc(url) + '" target="_blank" rel="noopener" style="text-align:center;text-decoration:none">⇩ Открыть и скачать</a>';
+  }
+  function genVideo() {
+    var p = $('vdPrompt').value.trim();
+    if (!p || $('vdGo').disabled) return;
+    if (cfg.maint && !isAdmin()) { vdErr('Идут технические работы. Попробуйте позже.'); return; }
+    if (limitReached()) { vdErr('Дневной лимит исчерпан (' + getLimit() + '). Он сбросится завтра.'); return; }
+    var wfText = $('vdWf').value.trim();
+    cfg.comfyUrl = $('vdUrl').value.trim(); cfg.videoWf = wfText; saveCfg();
+    if (!wfText) { vdErr('Сначала вставьте workflow ComfyUI в блоке настройки.'); $('vdSetup').open = true; return; }
+    var wf;
+    try { wf = prepareWorkflow(wfText, p); }
+    catch (e) {
+      vdErr(e.message === 'noprompt'
+        ? 'В workflow не найдено поле для описания. Впишите в текст промпта метку из двойных фигурных скобок со словом prompt.'
+        : 'Workflow не похож на JSON формата API (Save API Format).');
+      $('vdSetup').open = true; return;
+    }
+    vdErr(''); $('vdOut').innerHTML = ''; $('vdStatus').textContent = 'Отправляю в ComfyUI…'; vdBusy(true);
+    fetch(comfyUrl() + '/prompt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: wf, client_id: 'nevexona-neon' })
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok || !d.prompt_id) throw new Error((d.error && d.error.message) || ('ComfyUI ответил ' + r.status));
+        return d.prompt_id;
+      });
+    }).then(pollVideo).then(function (outputs) {
+      showVideo(outputs); addUse(); $('vdStatus').textContent = 'Готово.';
+    }).catch(function (e) {
+      $('vdStatus').textContent = '';
+      vdErr(e instanceof TypeError
+        ? 'Не удалось связаться с ComfyUI. Запустите его с флагом --enable-cors-header "*" и проверьте адрес.'
+        : e.message);
+    }).then(function () { vdBusy(false); });
+  }
+  $('videoBtn').onclick = function () {
+    closeSide();
+    $('vdUrl').value = cfg.comfyUrl || ''; $('vdWf').value = cfg.videoWf || '';
+    $('videoBg').classList.add('open');
+  };
+  $('vdClose').onclick = function () { $('videoBg').classList.remove('open'); };
+  $('videoBg').onclick = function (e) { if (e.target === this) this.classList.remove('open'); };
+  $('vdGo').onclick = genVideo;
 
   /* ---------- Voice: speech to text and text to speech ---------- */
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
