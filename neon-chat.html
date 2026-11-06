@@ -252,7 +252,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     <label>Язык голоса
       <input id="setLang" placeholder="ru-RU">
     </label>
-    <p class="hint">Всё работает без платных API: чат общается с Ollama на вашем компьютере. Чтобы страница с GitHub Pages могла подключиться, запустите Ollama с разрешением для сайта (см. README).</p>
+    <p class="hint">Всё работает без платных API: чат общается с Ollama на вашем компьютере. Если чат открыт не с вашего компьютера, а с сайта, разрешите этому сайту доступ к Ollama (см. README).</p>
     <div class="row">
       <button class="ghost" id="setCancel" style="width:auto;padding:9px 16px">Отмена</button>
       <button class="btn-new" id="setSave">Сохранить</button>
@@ -265,7 +265,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     <div class="stack" id="adminLogin">
       <h2>Вход для владельца</h2>
       <label>Логин
-        <input id="admUser" autocomplete="username" placeholder="Ник GitHub">
+        <input id="admUser" autocomplete="username" placeholder="Логин">
       </label>
       <label>Пароль
         <input id="admPass" type="password" autocomplete="current-password">
