@@ -210,6 +210,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
       <div class="limit-row"><span>Сообщения сегодня</span><b id="limText">0/30</b></div>
       <div class="bar"><div id="limBar"></div></div>
     </div>
+    <button class="ghost" id="photoBtn">🖼 Генерация фото</button>
     <button class="ghost" id="adminBtn">🛡 Админ-панель</button>
     <button class="ghost" id="openSettings">⚙ Настройки</button>
     <button class="ghost" id="exportBtn">⇩ Экспорт чатов</button>
@@ -252,10 +253,44 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     <label>Язык голоса
       <input id="setLang" placeholder="ru-RU">
     </label>
+    <label>Адрес Stable Diffusion WebUI (для фото)
+      <input id="setSd" placeholder="http://127.0.0.1:7860">
+    </label>
     <p class="hint">Всё работает без платных API: чат общается с Ollama на вашем компьютере. Если чат открыт не с вашего компьютера, а с сайта, разрешите этому сайту доступ к Ollama (см. README).</p>
     <div class="row">
       <button class="ghost" id="setCancel" style="width:auto;padding:9px 16px">Отмена</button>
       <button class="btn-new" id="setSave">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="photoBg">
+  <div class="modal" style="max-width:560px;max-height:92vh;overflow-y:auto">
+    <h2>Генерация фото</h2>
+    <label>Движок
+      <select id="phEngine" class="model" style="max-width:none">
+        <option value="sd">Локально: Stable Diffusion WebUI</option>
+        <option value="poll">Онлайн бесплатно: Pollinations</option>
+      </select>
+    </label>
+    <label>Описание
+      <textarea id="phPrompt" rows="3" placeholder="Неоновый оранжевый город ночью, дождь, киберпанк, детально"></textarea>
+    </label>
+    <label>Размер
+      <select id="phSize" class="model" style="max-width:none">
+        <option value="512x512">512 × 512</option>
+        <option value="768x512">768 × 512 (горизонтально)</option>
+        <option value="512x768">512 × 768 (вертикально)</option>
+        <option value="1024x1024">1024 × 1024 (нужна мощная видеокарта)</option>
+      </select>
+    </label>
+    <p class="hint err" id="phErr"></p>
+    <img id="phImg" alt="Результат" style="display:none;width:100%;border-radius:12px;border:1px solid var(--line)">
+    <a id="phDl" class="ghost" download="nevexona-photo.png" target="_blank" rel="noopener" style="display:none;text-align:center;text-decoration:none">⇩ Скачать</a>
+    <p class="hint">Локальный движок работает на вашем компьютере. Онлайн-движок бесплатный, но описание уходит на сторонний сервис и его работа не гарантирована.</p>
+    <div class="row">
+      <button class="ghost" id="phClose" style="width:auto;padding:9px 16px">Закрыть</button>
+      <button class="btn-new" id="phGo">Создать</button>
     </div>
   </div>
 </div>
@@ -581,6 +616,48 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     bar.classList.toggle('full', l > 0 && n >= l);
   }
 
+  /* ---------- Photo generation ---------- */
+  function sdUrl() { return (cfg.sdUrl || 'http://127.0.0.1:7860').replace(/\/+$/, ''); }
+  function phBusy(b) { $('phGo').disabled = b; $('phGo').textContent = b ? 'Генерирую…' : 'Создать'; }
+  function phShow(src) {
+    var i = $('phImg'); i.src = src; i.style.display = 'block';
+    var a = $('phDl'); a.href = src; a.style.display = 'block';
+  }
+  function genPhoto() {
+    var p = $('phPrompt').value.trim();
+    if (!p || $('phGo').disabled) return;
+    if (cfg.maint && !isAdmin()) { $('phErr').textContent = 'Идут технические работы. Попробуйте позже.'; return; }
+    if (limitReached()) { $('phErr').textContent = 'Дневной лимит исчерпан (' + getLimit() + '). Он сбросится завтра.'; return; }
+    var wh = $('phSize').value.split('x'), w = parseInt(wh[0], 10), h = parseInt(wh[1], 10);
+    $('phErr').textContent = ''; phBusy(true);
+
+    if ($('phEngine').value === 'sd') {
+      fetch(sdUrl() + '/sdapi/v1/txt2img', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: p, negative_prompt: 'blurry, low quality, deformed, watermark', width: w, height: h, steps: 25, cfg_scale: 7 })
+      }).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      }).then(function (d) {
+        if (!d.images || !d.images[0]) throw new Error('empty');
+        phShow('data:image/png;base64,' + d.images[0]); addUse();
+      }).catch(function () {
+        $('phErr').textContent = 'Не удалось получить картинку от Stable Diffusion. Запустите WebUI с флагами --api и --cors-allow-origins=* и проверьте адрес в настройках.';
+      }).then(function () { phBusy(false); });
+    } else {
+      var url = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(p) + '?width=' + w + '&height=' + h + '&nologo=true&seed=' + Math.floor(Math.random() * 1000000);
+      var t = new Image();
+      t.onload = function () { phShow(url); addUse(); phBusy(false); };
+      t.onerror = function () { $('phErr').textContent = 'Онлайн-движок не ответил или недоступен. Попробуйте позже или используйте локальный Stable Diffusion.'; phBusy(false); };
+      t.src = url;
+    }
+  }
+  $('photoBtn').onclick = function () { closeSide(); $('photoBg').classList.add('open'); };
+  $('phClose').onclick = function () { $('photoBg').classList.remove('open'); };
+  $('photoBg').onclick = function (e) { if (e.target === this) this.classList.remove('open'); };
+  $('phGo').onclick = genPhoto;
+
   /* ---------- Voice: speech to text and text to speech ---------- */
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   var rec = null, listening = false, heard = false;
@@ -717,7 +794,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
   $('model').onchange = function () { localStorage.setItem(LS.model, this.value); };
 
   $('openSettings').onclick = function () {
-    $('setUrl').value = cfg.url; $('setSystem').value = cfg.system; $('setLang').value = cfg.lang || 'ru-RU';    $('modalBg').classList.add('open'); closeSide();
+    $('setUrl').value = cfg.url; $('setSystem').value = cfg.system; $('setLang').value = cfg.lang || 'ru-RU'; $('setSd').value = cfg.sdUrl || 'http://127.0.0.1:7860';    $('modalBg').classList.add('open'); closeSide();
   };
   $('setCancel').onclick = function () { $('modalBg').classList.remove('open'); };
   $('modalBg').onclick = function (e) { if (e.target === this) this.classList.remove('open'); };
@@ -725,6 +802,7 @@ textarea#input:focus { border-color: var(--neon); box-shadow: var(--box-glow); }
     cfg.url = $('setUrl').value.trim() || 'http://localhost:11434';
     cfg.system = $('setSystem').value.trim() || DEFAULT_SYSTEM;
     cfg.lang = $('setLang').value.trim() || 'ru-RU';
+    cfg.sdUrl = $('setSd').value.trim() || 'http://127.0.0.1:7860';
     try { localStorage.setItem(LS.cfg, JSON.stringify(cfg)); } catch (e) {}
     $('modalBg').classList.remove('open');
     loadModels();
