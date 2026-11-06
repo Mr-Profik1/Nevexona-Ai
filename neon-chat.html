@@ -468,11 +468,11 @@ summary { cursor: pointer; color: var(--neon-2); font-size: 13px; }
   }
   /* ---------- AI in the browser (WebLLM, WebGPU) ---------- */
   var WEB_MODELS = [
-    ['Qwen2.5-1.5B-Instruct-q4f16_1-MLC', 'Qwen2.5 1.5B (быстрая, ~1 ГБ)'],
-    ['Qwen2.5-3B-Instruct-q4f16_1-MLC', 'Qwen2.5 3B (умнее, ~2 ГБ)'],
-    ['Llama-3.2-3B-Instruct-q4f16_1-MLC', 'Llama 3.2 3B (~2 ГБ)'],
-    ['Phi-3.5-mini-instruct-q4f16_1-MLC', 'Phi-3.5 mini (много памяти)'],
-    ['Qwen2.5-0.5B-Instruct-q4f16_1-MLC', 'Qwen2.5 0.5B (самая лёгкая)']
+    ['SmolLM2-360M-Instruct-q4f16_1-MLC', 'SmolLM2 360M (для 2 ГБ ОЗУ, очень слабая)'],
+    ['Qwen2.5-0.5B-Instruct-q4f16_1-MLC', 'Qwen2.5 0.5B (лёгкая, ~1 ГБ)'],
+    ['Qwen2.5-1.5B-Instruct-q4f16_1-MLC', 'Qwen2.5 1.5B (нужно 4+ ГБ ОЗУ)'],
+    ['Qwen2.5-3B-Instruct-q4f16_1-MLC', 'Qwen2.5 3B (нужно 6+ ГБ ОЗУ)'],
+    ['Llama-3.2-3B-Instruct-q4f16_1-MLC', 'Llama 3.2 3B (нужно 6+ ГБ ОЗУ)']
   ];
   var webEngine = null, webModelId = null;
   function ensureWeb(id) {
